@@ -1,4 +1,4 @@
-# Outboard
+# Ferally Divergent
 
 Four tools that keep things outside your head, because some heads do not hold them.
 
