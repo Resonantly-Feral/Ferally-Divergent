@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+<title>🥫 Pantry Pal — your external food memory</title>
+<style>
+  :root {
+    --bg: #f6f2ea;
+    --card: #ffffff;
+    --ink: #2b2620;
+    --ink-soft: #6b6257;
+    --line: #e5ddd0;
+    --accent: #c96f3b;
+    --accent-ink: #ffffff;
+    --ok: #3d8b52;
+    --ok-bg: #e3f2e7;
+    --warn: #b07d10;
+    --warn-bg: #fdf3d7;
+    --bad: #c0392b;
+    --bad-bg: #fbe4e0;
+    --grey-bg: #eeeae2;
+    --radius: 14px;
+    --shadow: 0 1px 4px rgba(43,38,32,.08);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1915;
+      --card: #262119;
+      --ink: #ece5da;
+      --ink-soft: #a89c8c;
+      --line: #3a332a;
+      --accent: #d97f47;
+      --ok: #6fbf85;
+      --ok-bg: #24352a;
+      --warn: #d9a83a;
+      --warn-bg: #3a321c;
+      --bad: #e07264;
+      --bad-bg: #40251f;
+      --grey-bg: #2e2921;
+      --shadow: 0 1px 4px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Georgia, 'Iowan Old Style', 'Palatino Linotype', serif;
+    font-size: 17px;
+    line-height: 1.45;
+    padding-bottom: 90px;
+  }
+  header {
+    padding: 18px 16px 10px;
+    text-align: center;
+  }
+  header h1 { margin: 0; font-size: 1.35rem; letter-spacing: .01em; }
+  header p { margin: 4px 0 0; color: var(--ink-soft); font-size: .85rem; font-style: italic; }
+
+  main { max-width: 640px; margin: 0 auto; padding: 0 12px; }
+
+  /* ---------- tabs ---------- */
+  nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    display: flex; gap: 8px; justify-content: center;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    z-index: 50;
+  }
+  nav button {
+    flex: 1; max-width: 220px;
+    font: inherit; font-size: 1rem;
+    padding: 12px 8px;
+    border-radius: var(--radius);
+    border: 2px solid var(--line);
+    background: var(--card); color: var(--ink);
+    cursor: pointer;
+  }
+  nav button.active { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); }
+  nav .badge {
+    display: inline-block; min-width: 22px; padding: 1px 6px; margin-left: 6px;
+    border-radius: 999px; background: var(--bad); color: #fff; font-size: .8rem;
+  }
+
+  section.view { display: none; }
+  section.view.active { display: block; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px;
+    margin: 12px 0;
+  }
+
+  .big-btn {
+    display: block; width: 100%;
+    font: inherit; font-size: 1.15rem;
+    padding: 16px;
+    border: none; border-radius: var(--radius);
+    background: var(--accent); color: var(--accent-ink);
+    cursor: pointer;
+  }
+  .big-btn:disabled { opacity: .5; cursor: wait; }
+  .ghost-btn {
+    display: block; width: 100%;
+    font: inherit; font-size: 1rem;
+    padding: 12px;
+    border: 2px dashed var(--line); border-radius: var(--radius);
+    background: transparent; color: var(--ink-soft);
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
+  /* ---------- camera ---------- */
+  #videoWrap {
+    position: relative; border-radius: var(--radius); overflow: hidden;
+    background: #000; aspect-ratio: 4 / 3;
+  }
+  #video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  #videoHint {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #fff; text-align: center; padding: 20px; font-size: .95rem;
+    background: rgba(0,0,0,.55);
+  }
+  #snapshot { width: 100%; border-radius: var(--radius); display: block; }
+
+  .status {
+    text-align: center; color: var(--ink-soft); font-style: italic;
+    padding: 8px 0; min-height: 1.4em; font-size: .95rem;
+  }
+  .status.error { color: var(--bad); font-style: normal; }
+
+  /* ---------- review + cupboard items ---------- */
+  .item-row {
+    display: grid;
+    grid-template-columns: 44px 1fr auto;
+    gap: 10px; align-items: center;
+    padding: 12px 4px;
+    border-bottom: 1px solid var(--line);
+  }
+  .item-row:last-child { border-bottom: none; }
+  .item-emoji { font-size: 1.8rem; text-align: center; }
+  .item-name { font-size: 1.05rem; font-weight: bold; }
+  .item-name input {
+    font: inherit; font-weight: bold; width: 100%;
+    border: none; border-bottom: 1px dashed var(--line);
+    background: transparent; color: var(--ink); padding: 2px 0;
+  }
+  .item-sub { color: var(--ink-soft); font-size: .82rem; margin-top: 2px; }
+  .item-sub input[type="date"] {
+    font: inherit; font-size: .82rem;
+    border: 1px solid var(--line); border-radius: 6px;
+    background: var(--bg); color: var(--ink); padding: 2px 6px;
+  }
+
+  .pill {
+    display: inline-block; padding: 3px 10px; border-radius: 999px;
+    font-size: .82rem; font-weight: bold; white-space: nowrap;
+  }
+  .pill.ok   { background: var(--ok-bg);   color: var(--ok); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.bad  { background: var(--bad-bg);  color: var(--bad); }
+  .pill.grey { background: var(--grey-bg); color: var(--ink-soft); }
+
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .row-actions button {
+    font: inherit; font-size: .85rem;
+    padding: 7px 10px; border-radius: 10px;
+    border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); cursor: pointer;
+  }
+  .row-actions button.eat  { border-color: var(--ok);  color: var(--ok); }
+  .row-actions button.bin  { border-color: var(--bad); color: var(--bad); }
+
+  .qty { display: inline-flex; align-items: center; gap: 8px; }
+  .qty button {
+    width: 30px; height: 30px; border-radius: 8px;
+    border: 1px solid var(--line); background: var(--card);
+    color: var(--ink); font-size: 1rem; cursor: pointer;
+  }
+
+  h2.section-head {
+    font-size: 1rem; margin: 18px 4px 6px;
+    color: var(--ink-soft); letter-spacing: .04em;
+  }
+  h2.section-head.urgent { color: var(--bad); }
+
+  .empty {
+    text-align: center; color: var(--ink-soft); padding: 30px 16px; font-style: italic;
+  }
+
+  .stats {
+    display: flex; gap: 10px; justify-content: center; flex-wrap: wrap;
+    font-size: .9rem; color: var(--ink-soft); margin: 14px 0;
+  }
+  .stats span { background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 5px 12px; }
+
+  details.settings { margin: 20px 0; color: var(--ink-soft); font-size: .88rem; }
+  details.settings input {
+    width: 100%; font: inherit; font-size: .88rem;
+    padding: 8px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--ink); margin-top: 6px;
+  }
+
+  .manual-add { display: flex; gap: 8px; }
+  .manual-add input {
+    flex: 1; font: inherit; padding: 12px;
+    border-radius: var(--radius); border: 1px solid var(--line);
+    background: var(--card); color: var(--ink);
+  }
+  .manual-add button {
+    font: inherit; padding: 12px 16px;
+    border-radius: var(--radius); border: none;
+    background: var(--accent); color: var(--accent-ink); cursor: pointer;
+  }
+
+  .banner {
+    border-radius: var(--radius); padding: 12px 14px; margin: 12px 0;
+    background: var(--bad-bg); color: var(--bad); font-weight: bold;
+  }
+  .banner.ok { background: var(--ok-bg); color: var(--ok); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🥫 Pantry Pal</h1>
+  <p>your cupboard, but it remembers <em>for</em> you</p>
+</header>
+
+<main>
+
+  <!-- ============ SCAN VIEW ============ -->
+  <section id="view-scan" class="view active">
+
+    <div class="card">
+      <div id="videoWrap">
+        <video id="video" autoplay playsinline muted></video>
+        <div id="videoHint">📷 tap "Start camera" below —<br>point it at your pantry shelf, fridge, or haul on the counter</div>
+      </div>
+      <div style="height:10px"></div>
+      <button class="big-btn" id="btnCamera">📷 Start camera</button>
+      <button class="ghost-btn" id="btnUpload">…or use a photo from your gallery</button>
+      <input type="file" id="fileInput" accept="image/*" capture="environment" hidden />
+    </div>
+
+    <p class="status" id="scanStatus"></p>
+
+    <!-- review panel: appears after a scan -->
+    <div class="card" id="reviewCard" hidden>
+      <img id="snapshot" alt="your scanned photo" hidden />
+      <div style="height:8px"></div>
+      <strong id="reviewTitle">I spotted these — check the dates, then add:</strong>
+      <div id="reviewList"></div>
+      <div style="height:10px"></div>
+      <button class="big-btn" id="btnAddAll">✅ Put them in the cupboard</button>
+      <button class="ghost-btn" id="btnDiscard">start over</button>
+    </div>
+
+    <div class="card">
+      <strong>Add by hand</strong> <span style="color:var(--ink-soft);font-size:.85rem">(no camera needed)</span>
+      <div style="height:8px"></div>
+      <div class="manual-add">
+        <input id="manualName" placeholder="e.g. tinned tomatoes" />
+        <button id="btnManual">Add</button>
+      </div>
+    </div>
+
+    <details class="settings">
+      <summary>⚙️ setup / troubleshooting</summary>
+      <p>Photo recognition talks to Claude through this repo's little server. Run
+      <code>ANTHROPIC_API_KEY=… node server.js</code> and open
+      <code>http://localhost:3001/pantry</code>. Manual add always works, even with no server.</p>
+      <label>API endpoint (leave as-is if using the server):
+        <input id="endpointInput" placeholder="/api/anthropic" />
+      </label>
+    </details>
+  </section>
+
+  <!-- ============ CUPBOARD VIEW ============ -->
+  <section id="view-cupboard" class="view">
+    <div id="cupboardBanner"></div>
+    <div id="cupboardBody"></div>
+    <div class="stats" id="statsRow"></div>
+  </section>
+
+</main>
+
+<nav>
+  <button id="tab-scan" class="active">📷 Scan</button>
+  <button id="tab-cupboard">🥫 Cupboard <span class="badge" id="urgentBadge" hidden></span></button>
+</nav>
+
+<script>
+"use strict";
+
+/* ============================================================
+   Pantry Pal — everything lives in localStorage in THIS browser.
+   Designed as an external memory: relative dates, big text,
+   one obvious action per screen.
+   ============================================================ */
+
+const LS_ITEMS = "pantrypal.items.v1";
+const LS_STATS = "pantrypal.stats.v1";
+const LS_ENDPOINT = "pantrypal.endpoint.v1";
+
+const CATEGORY_ORDER = [
+  "Fruit & Veg", "Dairy & Eggs", "Meat & Fish", "Bread & Bakery",
+  "Frozen", "Cans & Jars", "Dry Goods", "Condiments & Sauces",
+  "Snacks", "Drinks", "Other"
+];
+
+// fallback shelf-life guesses (days) for manual adds
+const SHELF_GUESS = [
+  // long-life forms first, so "tinned tomatoes" / "frozen chicken" don't
+  // fall through to the fresh-produce rules below
+  [/frozen|ice cream|icecream/i, 90, "🧊", "Frozen"],
+  [/tin|can(?:ned)?\b|jar|beans|chickpea/i, 365, "🥫", "Cans & Jars"],
+  [/milk|cream|yoghurt|yogurt/i, 7, "🥛", "Dairy & Eggs"],
+  [/cheese/i, 21, "🧀", "Dairy & Eggs"],
+  [/egg/i, 21, "🥚", "Dairy & Eggs"],
+  [/bread|bagel|roll|bun|wrap|tortilla/i, 5, "🍞", "Bread & Bakery"],
+  [/banana/i, 5, "🍌", "Fruit & Veg"],
+  [/apple/i, 21, "🍎", "Fruit & Veg"],
+  [/berr|grape/i, 4, "🫐", "Fruit & Veg"],
+  [/lettuce|salad|spinach|greens/i, 4, "🥬", "Fruit & Veg"],
+  [/tomato/i, 6, "🍅", "Fruit & Veg"],
+  [/potato/i, 30, "🥔", "Fruit & Veg"],
+  [/onion|garlic/i, 30, "🧅", "Fruit & Veg"],
+  [/carrot|veg/i, 10, "🥕", "Fruit & Veg"],
+  [/chicken|beef|pork|mince|steak|sausage|bacon/i, 3, "🥩", "Meat & Fish"],
+  [/fish|salmon|tuna/i, 2, "🐟", "Meat & Fish"],
+  [/pasta|rice|flour|oats|cereal|noodle|lentil/i, 270, "🌾", "Dry Goods"],
+  [/sauce|ketchup|mayo|mustard|oil|vinegar|jam|honey|spice/i, 180, "🫙", "Condiments & Sauces"],
+  [/crisps|chips|biscuit|cookie|chocolate|snack|cracker/i, 60, "🍪", "Snacks"],
+  [/juice|soda|cola|drink|water|beer|wine/i, 60, "🧃", "Drinks"],
+];
+
+/* ---------- state ---------- */
+let items = load(LS_ITEMS, []);          // [{id,name,emoji,category,qty,expiry,added}]
+let stats = load(LS_STATS, { eaten: 0, binned: 0 });
+let pendingReview = [];                   // items waiting for confirmation after a scan
+let stream = null;
+
+function load(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; }
+  catch { return fallback; }
+}
+function save() {
+  localStorage.setItem(LS_ITEMS, JSON.stringify(items));
+  localStorage.setItem(LS_STATS, JSON.stringify(stats));
+}
+const uid = () => Math.random().toString(36).slice(2, 10);
+const $ = (id) => document.getElementById(id);
+
+/* ---------- date helpers (relative, because raw dates don't stick) ---------- */
+const DAY = 86400000;
+const todayStart = () => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); };
+function daysLeft(iso) {
+  if (!iso) return null;
+  const target = new Date(iso + "T00:00:00").getTime();
+  return Math.round((target - todayStart()) / DAY);
+}
+function daysAgo(ts) { return Math.max(0, Math.round((todayStart() - ts) / DAY)); }
+function isoInDays(n) {
+  const d = new Date(todayStart() + n * DAY);
+  return d.toISOString().slice(0, 10);
+}
+function expiryLabel(iso) {
+  const n = daysLeft(iso);
+  if (n === null) return { text: "no date", cls: "grey" };
+  if (n < 0)  return { text: n === -1 ? "expired yesterday" : `expired ${-n} days ago`, cls: "bad" };
+  if (n === 0) return { text: "eat TODAY", cls: "bad" };
+  if (n === 1) return { text: "1 day left", cls: "warn" };
+  if (n <= 3) return { text: `${n} days left`, cls: "warn" };
+  if (n <= 14) return { text: `${n} days left`, cls: "ok" };
+  const w = Math.round(n / 7);
+  return { text: n <= 60 ? `~${w} weeks left` : `~${Math.round(n/30)} months left`, cls: "ok" };
+}
+function addedLabel(ts) {
+  const n = daysAgo(ts);
+  if (n === 0) return "added today";
+  if (n === 1) return "added yesterday";
+  return `added ${n} days ago`;
+}
+
+/* ---------- tabs ---------- */
+function show(view) {
+  for (const v of ["scan", "cupboard"]) {
+    $("view-" + v).classList.toggle("active", v === view);
+    $("tab-" + v).classList.toggle("active", v === view);
+  }
+  if (view === "cupboard") renderCupboard();
+}
+$("tab-scan").onclick = () => show("scan");
+$("tab-cupboard").onclick = () => show("cupboard");
+
+/* ---------- camera ---------- */
+$("btnCamera").onclick = async () => {
+  if (stream) { snap(); return; }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: "environment", width: { ideal: 1280 } }, audio: false
+    });
+    $("video").srcObject = stream;
+    $("videoHint").style.display = "none";
+    $("btnCamera").textContent = "📸 SNAP the shelf";
+  } catch (err) {
+    setStatus("Couldn't open the camera (" + err.name + "). You can still use a gallery photo or add by hand.", true);
+  }
+};
+
+function snap() {
+  const video = $("video");
+  const canvas = document.createElement("canvas");
+  // cap the long edge ~1280 to keep the upload light
+  const scale = Math.min(1, 1280 / Math.max(video.videoWidth, video.videoHeight));
+  canvas.width = Math.round(video.videoWidth * scale);
+  canvas.height = Math.round(video.videoHeight * scale);
+  canvas.getContext("2d").drawImage(video, 0, 0, canvas.width, canvas.height);
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.82);
+  analyse(dataUrl);
+}
+
+$("btnUpload").onclick = () => $("fileInput").click();
+$("fileInput").onchange = () => {
+  const file = $("fileInput").files[0];
+  if (!file) return;
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+    canvas.width = Math.round(img.width * scale);
+    canvas.height = Math.round(img.height * scale);
+    canvas.getContext("2d").drawImage(img, 0, 0, canvas.width, canvas.height);
+    analyse(canvas.toDataURL("image/jpeg", 0.82));
+    URL.revokeObjectURL(img.src);
+  };
+  img.src = URL.createObjectURL(file);
+  $("fileInput").value = "";
+};
+
+/* ---------- Claude vision call (via the repo's /api/anthropic proxy) ---------- */
+function endpoint() {
+  return localStorage.getItem(LS_ENDPOINT) || "/api/anthropic";
+}
+$("endpointInput").value = endpoint();
+$("endpointInput").onchange = () => {
+  localStorage.setItem(LS_ENDPOINT, $("endpointInput").value.trim() || "/api/anthropic");
+};
+
+function setStatus(msg, isError) {
+  const el = $("scanStatus");
+  el.textContent = msg;
+  el.classList.toggle("error", !!isError);
+}
+
+const ITEM_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["items"],
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "emoji", "category", "quantity", "shelf_life_days"],
+        properties: {
+          name: { type: "string", description: "Short everyday name, e.g. 'Tinned tomatoes'" },
+          emoji: { type: "string", description: "One emoji that best represents the item" },
+          category: { type: "string", enum: CATEGORY_ORDER },
+          quantity: { type: "integer", description: "How many of this item are visible (at least 1)" },
+          shelf_life_days: { type: "integer", description: "Typical days until this item should be used, counted from today, assuming it was bought recently. Use printed dates if legible in the photo." }
+        }
+      }
+    }
+  }
+};
+
+async function analyse(dataUrl) {
+  $("snapshot").src = dataUrl;
+  $("snapshot").hidden = false;
+  $("reviewCard").hidden = false;
+  $("reviewList").innerHTML = "";
+  $("btnAddAll").disabled = true;
+  setStatus("👀 Looking at your photo… (this takes ~10–20 seconds)");
+
+  const base64 = dataUrl.split(",")[1];
+  const body = {
+    model: "claude-opus-4-8",
+    max_tokens: 4096,
+    output_config: { format: { type: "json_schema", schema: ITEM_SCHEMA } },
+    messages: [{
+      role: "user",
+      content: [
+        { type: "image", source: { type: "base64", media_type: "image/jpeg", data: base64 } },
+        { type: "text", text:
+          "This is a photo of food items in someone's pantry, fridge, or shopping haul. " +
+          "List every distinct food or drink item you can identify. " +
+          "If a use-by / best-before date is legible on packaging, use it to set shelf_life_days " +
+          "(days from today). Otherwise estimate a typical shelf life for that item as stored. " +
+          "Skip non-food objects. If you truly can't identify any food, return an empty items array." }
+      ]
+    }]
+  };
+
+  try {
+    const res = await fetch(endpoint(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    if (!res.ok) throw new Error("API " + res.status + ": " + (await res.text()).slice(0, 200));
+    const msg = await res.json();
+    if (msg.stop_reason === "refusal") throw new Error("The model declined this image — try another photo.");
+    const textBlock = (msg.content || []).find(b => b.type === "text");
+    if (!textBlock) throw new Error("No text in response.");
+    const parsed = JSON.parse(textBlock.text);
+    const found = (parsed.items || []).filter(i => i.name);
+    if (!found.length) {
+      setStatus("Hmm, I couldn't spot any food in that photo — try getting closer or with more light.", true);
+      return;
+    }
+    pendingReview = found.map(i => ({
+      id: uid(),
+      name: i.name,
+      emoji: i.emoji || "🍽️",
+      category: CATEGORY_ORDER.includes(i.category) ? i.category : "Other",
+      qty: Math.max(1, i.quantity | 0),
+      expiry: isoInDays(Math.max(0, i.shelf_life_days | 0)),
+    }));
+    renderReview();
+    setStatus(`Found ${found.length} item${found.length > 1 ? "s" : ""} 🎉 — tweak anything that looks off.`);
+    $("btnAddAll").disabled = false;
+  } catch (err) {
+    console.error(err);
+    setStatus("Couldn't analyse the photo: " + err.message +
+      " — is the server running? (see ⚙️ setup below). You can still add items by hand.", true);
+  }
+}
+
+/* ---------- review panel ---------- */
+function renderReview() {
+  const list = $("reviewList");
+  list.innerHTML = "";
+  for (const it of pendingReview) {
+    const row = document.createElement("div");
+    row.className = "item-row";
+    row.innerHTML = `
+      <div class="item-emoji">${it.emoji}</div>
+      <div>
+        <div class="item-name"><input value="${escapeHtml(it.name)}" aria-label="item name"></div>
+        <div class="item-sub">
+          use by <input type="date" value="${it.expiry}">
+          · <span class="qty">
+              <button aria-label="one less">−</button>
+              <b>${it.qty}</b>
+              <button aria-label="one more">+</button>
+            </span>
+        </div>
+      </div>
+      <div class="row-actions"><button aria-label="remove">✕</button></div>`;
+    row.querySelector(".item-name input").oninput = e => { it.name = e.target.value; };
+    row.querySelector("input[type=date]").onchange = e => { it.expiry = e.target.value; };
+    const [minus, plus] = row.querySelectorAll(".qty button");
+    const count = row.querySelector(".qty b");
+    minus.onclick = () => { it.qty = Math.max(1, it.qty - 1); count.textContent = it.qty; };
+    plus.onclick  = () => { it.qty += 1; count.textContent = it.qty; };
+    row.querySelector(".row-actions button").onclick = () => {
+      pendingReview = pendingReview.filter(p => p.id !== it.id);
+      renderReview();
+    };
+    list.appendChild(row);
+  }
+}
+
+$("btnAddAll").onclick = () => {
+  const now = Date.now();
+  for (const it of pendingReview) items.push({ ...it, added: now });
+  const n = pendingReview.length;
+  pendingReview = [];
+  save();
+  $("reviewCard").hidden = true;
+  setStatus("");
+  show("cupboard");
+  flashBanner(`✅ ${n} item${n > 1 ? "s" : ""} safely in the cupboard. Nothing gets forgotten now.`);
+};
+
+$("btnDiscard").onclick = () => {
+  pendingReview = [];
+  $("reviewCard").hidden = true;
+  setStatus("");
+};
+
+/* ---------- manual add ---------- */
+$("btnManual").onclick = addManual;
+$("manualName").onkeydown = e => { if (e.key === "Enter") addManual(); };
+function addManual() {
+  const name = $("manualName").value.trim();
+  if (!name) return;
+  let days = 14, emoji = "🍽️", category = "Other";
+  for (const [re, d, em, cat] of SHELF_GUESS) {
+    if (re.test(name)) { days = d; emoji = em; category = cat; break; }
+  }
+  items.push({ id: uid(), name, emoji, category, qty: 1, expiry: isoInDays(days), added: Date.now() });
+  save();
+  $("manualName").value = "";
+  show("cupboard");
+  flashBanner(`✅ "${name}" is in the cupboard (guessed ${days} days — tap ✏️ to fix).`);
+}
+
+/* ---------- cupboard ---------- */
+let bannerMsg = null;
+function flashBanner(msg) { bannerMsg = msg; renderCupboard(); }
+
+function renderCupboard() {
+  const body = $("cupboardBody");
+  const bannerEl = $("cupboardBanner");
+  body.innerHTML = "";
+  bannerEl.innerHTML = "";
+
+  if (bannerMsg) {
+    bannerEl.innerHTML = `<div class="banner ok">${bannerMsg}</div>`;
+    bannerMsg = null;
+  }
+
+  updateBadge();
+
+  if (!items.length) {
+    body.innerHTML = `<div class="card"><div class="empty">The cupboard is empty.<br>📷 Scan a shelf or add something by hand — future-you will thank you.</div></div>`;
+    renderStats();
+    return;
+  }
+
+  const urgent = items.filter(i => { const n = daysLeft(i.expiry); return n !== null && n <= 3; })
+                      .sort((a, b) => daysLeft(a.expiry) - daysLeft(b.expiry));
+  const rest = items.filter(i => !urgent.includes(i));
+
+  if (urgent.length) {
+    const h = document.createElement("h2");
+    h.className = "section-head urgent";
+    h.textContent = "🚨 EAT ME FIRST";
+    body.appendChild(h);
+    const card = document.createElement("div");
+    card.className = "card";
+    for (const it of urgent) card.appendChild(itemRow(it));
+    body.appendChild(card);
+  }
+
+  for (const cat of CATEGORY_ORDER) {
+    const inCat = rest.filter(i => i.category === cat)
+                      .sort((a, b) => (daysLeft(a.expiry) ?? 9e9) - (daysLeft(b.expiry) ?? 9e9));
+    if (!inCat.length) continue;
+    const h = document.createElement("h2");
+    h.className = "section-head";
+    h.textContent = cat;
+    body.appendChild(h);
+    const card = document.createElement("div");
+    card.className = "card";
+    for (const it of inCat) card.appendChild(itemRow(it));
+    body.appendChild(card);
+  }
+
+  renderStats();
+}
+
+function itemRow(it) {
+  const row = document.createElement("div");
+  row.className = "item-row";
+  const label = expiryLabel(it.expiry);
+  row.innerHTML = `
+    <div class="item-emoji">${it.emoji}</div>
+    <div>
+      <div class="item-name">${escapeHtml(it.name)}${it.qty > 1 ? ` <span style="color:var(--ink-soft)">×${it.qty}</span>` : ""}</div>
+      <div class="item-sub"><span class="pill ${label.cls}">${label.text}</span> · ${addedLabel(it.added)}</div>
+    </div>
+    <div class="row-actions">
+      <button class="eat" title="I ate / used it">😋 ate it</button>
+      <button class="bin" title="I had to throw it away">🗑️</button>
+      <button class="edit" title="edit date">✏️</button>
+    </div>`;
+  row.querySelector(".eat").onclick = () => consume(it, "eaten");
+  row.querySelector(".bin").onclick = () => consume(it, "binned");
+  row.querySelector(".edit").onclick = () => editDate(row, it);
+  return row;
+}
+
+function consume(it, how) {
+  if (it.qty > 1) { it.qty -= 1; }
+  else { items = items.filter(x => x.id !== it.id); }
+  stats[how === "eaten" ? "eaten" : "binned"] += 1;
+  save();
+  if (how === "eaten") {
+    const n = daysLeft(it.expiry);
+    flashBanner(n !== null && n >= 0
+      ? `😋 "${it.name}" eaten in time — that's ${stats.eaten} saved from the bin!`
+      : `😋 "${it.name}" — logged.`);
+  } else {
+    renderCupboard();
+  }
+}
+
+function editDate(row, it) {
+  const sub = row.querySelector(".item-sub");
+  sub.innerHTML = `use by <input type="date" value="${it.expiry || ""}">`;
+  const inp = sub.querySelector("input");
+  inp.focus();
+  inp.onchange = () => { it.expiry = inp.value; save(); renderCupboard(); };
+}
+
+function updateBadge() {
+  const n = items.filter(i => { const d = daysLeft(i.expiry); return d !== null && d <= 3; }).length;
+  const badge = $("urgentBadge");
+  badge.hidden = n === 0;
+  badge.textContent = n;
+}
+
+function renderStats() {
+  $("statsRow").innerHTML = `
+    <span>😋 eaten in time: <b>${stats.eaten}</b></span>
+    <span>🗑️ binned: <b>${stats.binned}</b></span>
+    <span>🥫 in cupboard: <b>${items.reduce((s, i) => s + i.qty, 0)}</b></span>`;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+/* ---------- boot ---------- */
+updateBadge();
+// if anything is about to expire, open straight onto the cupboard so it's seen
+if (items.some(i => { const d = daysLeft(i.expiry); return d !== null && d <= 1; })) {
+  show("cupboard");
+  flashBanner("⏰ Heads up — something in here needs eating very soon (see EAT ME FIRST).");
+}
+</script>
+</body>
+</html>

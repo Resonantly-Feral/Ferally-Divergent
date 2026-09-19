@@ -1,0 +1,1463 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anchor — outboard memory</title>
+<style>
+  :root{
+    --bg:#f6f5f2; --card:#ffffff; --ink:#26241f; --ink-soft:#6b675e;
+    --line:#e4e1da; --accent:#3d6b5c; --accent-ink:#ffffff;
+    --danger:#a04434; --chip:#eef0ea; --focus:#3d6b5c;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#191817; --card:#232220; --ink:#eae7e1; --ink-soft:#a39e93;
+      --line:#37352f; --accent:#7fb8a4; --accent-ink:#10201a;
+      --danger:#e08b7b; --chip:#2c2b27; --focus:#7fb8a4;
+    }
+  }
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font:17px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding:1rem 1rem 6rem;
+  }
+  main{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:.9rem}
+  h1{font-size:1.25rem;margin:0}
+  .day-phrase{color:var(--ink-soft);margin:.15rem 0 0;font-size:1rem}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:.9rem 1rem}
+  .card h2{font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-soft);margin:0;font-weight:600}
+
+  details.card summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:.5rem}
+  details.card summary::-webkit-details-marker{display:none}
+  details.card summary::after{content:"▸";color:var(--ink-soft)}
+  details.card[open] summary::after{content:"▾"}
+  details.card[open] summary{margin-bottom:.55rem}
+
+  textarea,input[type=text],input[type=time],input[type=number]{
+    width:100%;background:var(--bg);color:var(--ink);
+    border:1px solid var(--line);border-radius:10px;
+    padding:.6rem .75rem;font:inherit;resize:vertical;
+  }
+  textarea:focus,input:focus,button:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+
+  button{
+    font:inherit;font-size:.92rem;border:1px solid var(--line);border-radius:10px;
+    background:var(--card);color:var(--ink);padding:.45rem .8rem;cursor:pointer;
+  }
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+  button.ghost{background:transparent;border-color:transparent;color:var(--ink-soft);padding:.3rem .5rem}
+  button.ghost:hover{color:var(--danger);border-color:transparent}
+  .row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
+  .grow{flex:1}
+
+  .slots{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+  .slot label{display:block;font-size:.78rem;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);margin-bottom:.3rem;font-weight:600}
+  @media(max-width:480px){.slots{grid-template-columns:1fr}}
+
+  #capture{min-height:3.2rem}
+  .hint{font-size:.85rem;color:var(--ink-soft);margin:.4rem 0 0}
+  .q-label{font-size:.9rem;color:var(--ink-soft);margin:.7rem 0 .3rem;font-weight:600}
+  .statusline{display:flex;gap:.5rem;align-items:center;margin-top:.6rem;padding:.55rem .7rem;background:var(--chip);border-radius:10px;font-size:.92rem}
+  .sel{border-color:var(--accent)!important;background:var(--accent)!important;color:var(--accent-ink)!important;font-weight:600}
+
+  /* Timer */
+  .bar-wrap{background:var(--bg);border:1px solid var(--line);border-radius:999px;height:1.5rem;overflow:hidden;margin:.55rem 0 .4rem}
+  .bar{background:var(--accent);height:100%;width:100%;border-radius:999px;transition:width 1s linear}
+  #timer-phrase{font-size:1rem}
+  #timer-panel{display:none}
+  #timer-panel.on{display:block}
+  .pulse{animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{50%{opacity:.55}}
+
+  /* Timeline */
+  .entry{padding:.7rem 0;border-top:1px solid var(--line)}
+  .entry:first-of-type{border-top:none}
+  .entry .when{font-size:.85rem;color:var(--ink-soft);display:flex;justify-content:space-between;gap:.5rem;align-items:baseline}
+  .entry .text{margin:.25rem 0 0;white-space:pre-wrap;word-wrap:break-word}
+  .day-head{font-weight:700;margin:.9rem 0 .1rem;font-size:1rem}
+  .tag{color:var(--accent);cursor:pointer;font-weight:600}
+  .checkin-mark{font-size:.78rem;background:var(--chip);border-radius:6px;padding:.1rem .45rem;color:var(--ink-soft)}
+  .empty{color:var(--ink-soft);text-align:center;padding:1.2rem 0}
+
+  #resurface-panel,#checkin-panel{display:none}
+  #resurface-panel.on,#checkin-panel.on{display:block}
+  #resurface-panel{border-left:4px solid var(--accent)}
+  #checkin-panel .q{margin:.6rem 0 .2rem;font-weight:600}
+
+  /* Money + results */
+  .result-box{margin-top:.7rem;padding:.8rem .9rem;border-radius:10px;background:var(--chip)}
+  .result-box .big{font-size:1.3rem;font-weight:700}
+  .late{color:var(--danger)}
+
+  /* People */
+  .person{border-top:1px solid var(--line);padding:.6rem 0}
+  .person:first-child{border-top:none}
+  .person .p-head{display:flex;justify-content:space-between;gap:.5rem;align-items:baseline;cursor:pointer}
+  .person .p-name{font-weight:700}
+  .person .p-when{font-size:.82rem;color:var(--ink-soft)}
+  .person .p-body{display:none;margin-top:.5rem}
+  .person.open .p-body{display:block}
+
+  /* Overlays */
+  .overlay{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;text-align:center;padding:1.5rem;overflow-y:auto}
+  #yell-overlay{background:#3d6b5c;color:#fff}
+  #yell-overlay.intense{background:#a04434;animation:yellpulse 1s ease-in-out infinite}
+  @keyframes yellpulse{50%{filter:brightness(1.3)}}
+  .yell-box{max-width:34rem}
+  #yell-text{font-size:clamp(1.5rem,6vw,2.5rem);font-weight:800;line-height:1.25;margin-bottom:1.2rem}
+  .yell-box button,#shred-overlay button{font-size:1.05rem;padding:.7rem 1.2rem;border:2px solid #fff;background:transparent;color:#fff;border-radius:12px;margin:.25rem}
+  .yell-box button.go,#shred-overlay button.go{background:#fff;color:#26241f;font-weight:700}
+
+  #shred-overlay{background:#2c4a5e;color:#fff}
+  #shred-count{font-size:1rem;opacity:.8;margin-bottom:.8rem}
+  #shred-step{font-size:clamp(1.5rem,6vw,2.4rem);font-weight:800;line-height:1.25;margin-bottom:1.4rem}
+  #shred-smaller-row{margin-top:1rem}
+  #shred-smaller-row input{max-width:24rem;margin:0 auto;background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.5)}
+  #shred-smaller-row input::placeholder{color:rgba(255,255,255,.7)}
+
+  #panic-overlay{background:rgba(20,20,18,.88)}
+  .panic-box{background:var(--card);color:var(--ink);border-radius:16px;padding:1.2rem 1.3rem;max-width:34rem;width:100%;text-align:left;max-height:85vh;overflow-y:auto}
+  .panic-box h2{margin:0 0 .6rem;font-size:1.15rem}
+  .plot-item{padding:.5rem 0;border-top:1px solid var(--line)}
+  .plot-item:first-of-type{border-top:none}
+  .plot-label{font-size:.78rem;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-soft);font-weight:600}
+
+  /* Panic button + body-double banner */
+  #panic-btn{position:fixed;right:1rem;bottom:1rem;z-index:60;width:3.6rem;height:3.6rem;border-radius:50%;
+    font-size:1.5rem;background:var(--accent);color:var(--accent-ink);border:none;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+  #bd-banner{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;
+    background:var(--card);border-top:2px solid var(--accent);padding:.6rem 5.2rem .6rem 1rem;font-size:.95rem}
+  #bd-banner.ask{background:var(--accent);color:var(--accent-ink)}
+  #bd-banner.ask button{border-color:var(--accent-ink);color:var(--accent-ink);background:transparent}
+
+  .confetti{position:fixed;top:-2rem;z-index:70;font-size:1.4rem;animation:fall 1.4s ease-in forwards;pointer-events:none}
+  @keyframes fall{to{transform:translateY(110vh) rotate(540deg);opacity:.6}}
+
+  footer{color:var(--ink-soft);font-size:.85rem;text-align:center;padding:1rem 0 1rem}
+  footer button{font-size:.85rem}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>⚓ Anchor</h1>
+    <p class="day-phrase" id="day-phrase"></p>
+  </header>
+
+  <!-- NOW / NEXT -->
+  <details class="card" id="d-now" open>
+    <summary><h2>Right now</h2></summary>
+    <div class="slots">
+      <div class="slot">
+        <label for="now-slot">Now, I am…</label>
+        <input type="text" id="now-slot" placeholder="e.g. replying to Sam's email">
+      </div>
+      <div class="slot">
+        <label for="next-slot">After that…</label>
+        <input type="text" id="next-slot" placeholder="e.g. hang the washing">
+      </div>
+    </div>
+    <p class="hint">These two boxes are your working memory. When you finish a thing, come back here before deciding anything else.</p>
+  </details>
+
+  <!-- TODAY: SPOONS STRIP -->
+  <details class="card" id="d-day" open>
+    <summary><h2>Today — one big thing per block</h2></summary>
+    <div class="slots" style="grid-template-columns:1fr">
+      <div class="slot"><label for="day-m">Morning</label><input type="text" id="day-m" placeholder="one thing. that's it."></div>
+      <div class="slot"><label for="day-a">Afternoon</label><input type="text" id="day-a" placeholder="one thing."></div>
+      <div class="slot"><label for="day-e">Evening</label><input type="text" id="day-e" placeholder="one thing. rest counts."></div>
+    </div>
+    <p class="hint">Three blocks, three slots, no more. If something doesn't fit: it's tomorrow's problem, and that's allowed. Clears itself each morning.</p>
+  </details>
+
+  <!-- GET ME MOVING -->
+  <details class="card" id="d-move" open>
+    <summary><h2>Get me moving</h2></summary>
+    <input type="text" id="nag-task" placeholder="the thing you're avoiding — e.g. shower, emails, leave the house">
+    <div class="row" style="margin-top:.5rem" id="nag-buttons">
+      <button data-mode="nudge">Nudge me</button>
+      <button data-mode="nag">Nag me</button>
+      <button data-mode="yell">YELL AT ME 📢</button>
+    </div>
+    <p class="hint">Whichever you pick, it escalates until you press “I'm moving”. Keep this tab open.</p>
+    <div id="nag-status" class="statusline" hidden>
+      <span id="nag-status-text" class="grow"></span>
+      <button id="nag-stop">Stop</button>
+    </div>
+  </details>
+
+  <!-- TASK SHREDDER -->
+  <details class="card" id="d-shred">
+    <summary><h2>⚡ Task shredder</h2></summary>
+    <div id="shred-setup">
+      <input type="text" id="shred-task" placeholder="the horrifying vague task — e.g. sort out life admin">
+      <div id="shred-builder" hidden>
+        <p class="q-label">Break it into steps so small they're silly. (“open laptop” counts.)</p>
+        <div id="shred-list"></div>
+        <input type="text" id="shred-step-input" placeholder="tiny step — press Enter to add">
+        <div class="row" style="margin-top:.6rem">
+          <button class="primary" id="shred-start">Start ▶ (one step at a time)</button>
+          <button id="shred-scrap">scrap it</button>
+        </div>
+      </div>
+      <div class="row" style="margin-top:.5rem" id="shred-begin-row">
+        <button class="primary" id="shred-begin">Shred it</button>
+      </div>
+    </div>
+    <div id="shred-resume" class="statusline" hidden>
+      <span id="shred-resume-text" class="grow"></span>
+      <button class="primary" id="shred-resume-btn">Resume ▶</button>
+      <button id="shred-abandon">scrap</button>
+    </div>
+    <p class="hint">You'll only ever see one step at a time. The wall of awful never gets rendered.</p>
+  </details>
+
+  <!-- BODY DOUBLE -->
+  <details class="card" id="d-bd">
+    <summary><h2>👥 Body double</h2></summary>
+    <input type="text" id="bd-task" placeholder="what are we working on together?">
+    <div class="row" style="margin-top:.5rem">
+      <button class="primary" id="bd-start">Start session</button>
+    </div>
+    <p class="hint">I'll sit with you (bottom of the screen) and check in every few minutes: “still on it?”. No judgement if you drifted — just a hand back to the task.</p>
+  </details>
+
+  <!-- WHEN SHOULD I LEAVE -->
+  <details class="card" id="d-leave">
+    <summary><h2>🕐 When should I leave?</h2></summary>
+    <div class="slots">
+      <div class="slot">
+        <label for="lv-arrive">Be there at</label>
+        <input type="time" id="lv-arrive">
+      </div>
+      <div class="slot">
+        <label for="lv-where">Going where? (optional)</label>
+        <input type="text" id="lv-where" placeholder="e.g. dentist">
+      </div>
+    </div>
+    <p class="q-label">Journey takes about…</p>
+    <div class="row" id="lv-journey">
+      <button data-min="10">ten min</button>
+      <button data-min="20" class="sel">twenty min</button>
+      <button data-min="30">thirty min</button>
+      <button data-min="45">forty-five min</button>
+      <button data-min="60">an hour</button>
+    </div>
+    <p class="q-label">Faff time (shoes, keys, one last scroll)…</p>
+    <div class="row" id="lv-faff">
+      <button data-min="0">none</button>
+      <button data-min="5">five min</button>
+      <button data-min="10" class="sel">ten min</button>
+      <button data-min="15">fifteen min</button>
+    </div>
+    <div class="row" style="margin-top:.7rem">
+      <button class="primary" id="lv-calc">Work it out for me</button>
+    </div>
+    <div id="lv-result" class="result-box" hidden></div>
+    <div id="lv-armed" class="statusline" hidden>
+      <span id="lv-armed-text" class="grow"></span>
+      <button id="lv-cancel">Cancel</button>
+    </div>
+  </details>
+
+  <!-- BODY STUFF -->
+  <details class="card" id="d-body">
+    <summary><h2>🫀 Body stuff — meat suit maintenance</h2></summary>
+    <p class="hint" style="margin-top:0">Tap when you do the thing. Tick the box if you want me to nag when it's been too long. Tap each one once to arm it.</p>
+    <div id="body-rows"></div>
+  </details>
+
+  <!-- CAPTURE -->
+  <details class="card" id="d-capture" open>
+    <summary><h2>Catch it before it evaporates</h2></summary>
+    <textarea id="capture" placeholder="Anything. A thing you did, a thought, who you spoke to, something to remember later. Press Enter to save."></textarea>
+    <div class="row" style="margin-top:.5rem">
+      <button class="primary" id="save-btn">Save this moment</button>
+      <button id="checkin-btn">Daily check-in</button>
+      <button id="resurface-btn">Show me a past moment</button>
+    </div>
+    <p class="hint">Tip: write <span class="tag">#tags</span> inside an entry (like #work or #health) — tap a tag later to see everything related.</p>
+  </details>
+
+  <!-- WORK WINS (brag file) -->
+  <details class="card" id="d-wins">
+    <summary><h2>🏆 Work wins — your brag file</h2></summary>
+    <p class="hint" style="margin-top:0">Promotions run on receipts, not memory. Log the win the moment it happens — future-you walks into the review with a list instead of a blank.</p>
+    <input type="text" id="win-text" placeholder="what did you pull off? e.g. fixed the bug nobody could find, ran the demo solo">
+    <input type="text" id="win-impact" placeholder="why it mattered / who noticed (optional — but gold at review time)" style="margin-top:.5rem">
+    <div class="row" style="margin-top:.5rem">
+      <button class="primary" id="win-save">Log the win 🏆</button>
+      <button id="kudos-save">Log kudos 💬</button>
+    </div>
+    <p class="hint">Kudos = someone's <em>exact words</em>. Top box: the quote. Second box: who said it, and where. A verbatim “you saved us” from a colleague is the strongest thing you can paste into a self-review.</p>
+    <p class="q-label">Copy for my review, covering…</p>
+    <div class="row" id="wins-range">
+      <button data-mo="3">three months</button>
+      <button data-mo="6">six months</button>
+      <button data-mo="12">a year</button>
+      <button data-mo="0" class="sel">everything</button>
+    </div>
+    <div class="row" style="margin-top:.5rem">
+      <button id="wins-copy">📋 Copy the list</button>
+      <label style="font-size:.82rem;color:var(--ink-soft)">
+        <input type="checkbox" id="wins-nagon"> nag me if a week goes by with nothing logged
+      </label>
+    </div>
+    <div id="wins-list"></div>
+  </details>
+
+  <!-- DAILY CHECK-IN -->
+  <section class="card" id="checkin-panel">
+    <h2>Today's check-in</h2>
+    <p class="hint" style="margin-top:0">Future-you cannot replay today. These three lines are how they'll know it happened.</p>
+    <p class="q">What did you actually do today?</p>
+    <input type="text" id="ci-did" placeholder="even small things count">
+    <p class="q">Who did you talk to, and about what?</p>
+    <input type="text" id="ci-who" placeholder="people, messages, calls">
+    <p class="q">How did today feel, in plain words?</p>
+    <input type="text" id="ci-felt" placeholder="e.g. slow morning, good afternoon">
+    <p class="q">Anything worth the brag file? (optional)</p>
+    <input type="text" id="ci-win" placeholder="a fix, a save, a kind word from someone — goes straight into 🏆 Work wins">
+    <div class="row" style="margin-top:.7rem">
+      <button class="primary" id="ci-save">Save check-in</button>
+      <button id="ci-cancel">Not now</button>
+    </div>
+  </section>
+
+  <!-- RESURFACE -->
+  <section class="card" id="resurface-panel">
+    <h2>From your past</h2>
+    <div id="resurface-body"></div>
+    <div class="row" style="margin-top:.6rem">
+      <button id="resurface-again">Another one</button>
+      <button id="resurface-close">Close</button>
+    </div>
+  </section>
+
+  <!-- TIMER -->
+  <details class="card" id="d-timer">
+    <summary><h2>Timer — a bar, not a clock</h2></summary>
+    <div class="row" id="timer-buttons">
+      <button data-min="10">Short <span style="opacity:.6">(≈ ten min)</span></button>
+      <button data-min="25">Medium <span style="opacity:.6">(≈ twenty-five min)</span></button>
+      <button data-min="50">Long <span style="opacity:.6">(≈ fifty min)</span></button>
+    </div>
+    <div id="timer-panel">
+      <div class="bar-wrap"><div class="bar" id="timer-bar"></div></div>
+      <div class="row">
+        <span id="timer-phrase" class="grow"></span>
+        <button id="timer-stop">Stop</button>
+      </div>
+    </div>
+  </details>
+
+  <!-- PEOPLE FILE -->
+  <details class="card" id="d-people">
+    <summary><h2>🧾 People file — who is this again?</h2></summary>
+    <p class="hint" style="margin-top:0">Your spy dossiers. How you know them, what you last talked about, what you promised. Check before you reply.</p>
+    <div class="row" style="margin-top:.5rem">
+      <input type="text" id="person-search" class="grow" placeholder="search people… or type a new name" style="width:auto">
+      <button class="primary" id="person-add">Add person</button>
+    </div>
+    <div id="people-list"></div>
+  </details>
+
+  <!-- MONEY LENS -->
+  <details class="card" id="d-money">
+    <summary><h2>💰 Money lens — numbers into meaning</h2></summary>
+    <div class="row">
+      <input type="text" id="money-amt" class="grow" inputmode="decimal" placeholder="type an amount, e.g. 35" style="width:auto">
+      <button class="primary" id="money-go">Translate</button>
+    </div>
+    <p class="q-label">Split between…</p>
+    <div class="row" id="money-split">
+      <button data-n="2">two people</button>
+      <button data-n="3">three</button>
+      <button data-n="4">four</button>
+      <button data-n="5">five</button>
+      <button data-n="6">six</button>
+    </div>
+    <p class="q-label">Add a tip…</p>
+    <div class="row" id="money-tip">
+      <button data-p="10">small (10%)</button>
+      <button data-p="15">decent (15%)</button>
+      <button data-p="20">generous (20%)</button>
+    </div>
+    <div id="money-result" class="result-box" hidden></div>
+    <details style="margin-top:.7rem">
+      <summary style="cursor:pointer;font-size:.88rem;color:var(--ink-soft)">⚙ my anchors (used for the translation)</summary>
+      <div class="slots" style="margin-top:.5rem">
+        <div class="slot"><label for="m-symbol">Currency symbol</label><input type="text" id="m-symbol" maxlength="3"></div>
+        <div class="slot"><label for="m-coffee">A coffee costs about</label><input type="number" id="m-coffee" min="0" step="0.5"></div>
+        <div class="slot"><label for="m-takeaway">A takeaway costs about</label><input type="number" id="m-takeaway" min="0" step="1"></div>
+        <div class="slot"><label for="m-wage">I earn per hour (optional)</label><input type="number" id="m-wage" min="0" step="0.5" placeholder="leave empty to skip"></div>
+      </div>
+    </details>
+  </details>
+
+  <!-- TIMELINE -->
+  <details class="card" id="d-record" open>
+    <summary><h2>Your record</h2></summary>
+    <input type="text" id="search" placeholder="Search everything you've ever written here…">
+    <div id="timeline"></div>
+  </details>
+
+  <footer>
+    Everything lives only in this browser — nothing is sent anywhere.<br>
+    <span style="display:inline-block;margin-top:.4rem">
+      <button id="export-btn">Download a backup</button>
+      <button id="import-btn">Restore a backup</button>
+      <input type="file" id="import-file" accept=".json" hidden>
+    </span>
+  </footer>
+</main>
+
+<!-- YELL OVERLAY -->
+<div id="yell-overlay" class="overlay" hidden>
+  <div class="yell-box">
+    <div id="yell-text"></div>
+    <button class="go" id="yell-done">I'M MOVING ✅</button>
+    <button id="yell-snooze">five more minutes 🙃</button>
+  </div>
+</div>
+
+<!-- SHREDDER OVERLAY -->
+<div id="shred-overlay" class="overlay" hidden>
+  <div class="yell-box">
+    <div id="shred-count"></div>
+    <div id="shred-step"></div>
+    <button class="go" id="shred-done">DONE ✅</button>
+    <button id="shred-smaller">make it smaller</button>
+    <button id="shred-pause">pause</button>
+    <div id="shred-smaller-row" hidden>
+      <input type="text" id="shred-smaller-input" placeholder="an even smaller first bite — press Enter">
+    </div>
+  </div>
+</div>
+
+<!-- PANIC OVERLAY -->
+<div id="panic-overlay" class="overlay" hidden>
+  <div class="panic-box">
+    <h2>🔦 Okay. Breathe. Here's the plot:</h2>
+    <div id="panic-body"></div>
+    <div class="row" style="margin-top:.9rem">
+      <button class="primary" id="panic-close">Got it — back to it</button>
+    </div>
+  </div>
+</div>
+
+<button id="panic-btn" title="What was I doing?">🔦</button>
+
+<div id="bd-banner" hidden>
+  <span id="bd-text" class="grow"></span>
+  <button id="bd-yep" hidden>yep, on it ✅</button>
+  <button id="bd-drift" hidden>drifted 🫠</button>
+  <button id="bd-done">done</button>
+</div>
+
+<script>
+"use strict";
+/* ---------- storage ---------- */
+const K = {
+  entries:"anchor.entries.v1", now:"anchor.now.v1", next:"anchor.next.v1",
+  nag:"anchor.nag.v1", leave:"anchor.leave.v1",
+  day:"anchor.day.v1", shred:"anchor.shred.v1", bd:"anchor.bd.v1",
+  body:"anchor.body.v1", people:"anchor.people.v1", money:"anchor.money.v1",
+  wins:"anchor.wins.v1", winsMeta:"anchor.winsmeta.v1", open:"anchor.open.v1"
+};
+const load = (k, fb) => { try { return JSON.parse(localStorage.getItem(k)) ?? fb; } catch { return fb; } };
+const save = (k, v) => localStorage.setItem(k, JSON.stringify(v));
+const wipe = k => localStorage.removeItem(k);
+let entries = load(K.entries, []);
+
+/* ---------- numbers & time in words (dyscalculia-friendly) ---------- */
+const ONES = ["zero","one","two","three","four","five","six","seven","eight","nine","ten",
+  "eleven","twelve","thirteen","fourteen","fifteen","sixteen","seventeen","eighteen","nineteen"];
+const TENS = ["","","twenty","thirty","forty","fifty","sixty","seventy","eighty","ninety"];
+function numWord(n){
+  n = Math.round(n);
+  if (n < 20) return ONES[n];
+  if (n < 100) return TENS[Math.floor(n/10)] + (n%10 ? "-" + ONES[n%10] : "");
+  return String(n);
+}
+const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+const sameDay = (a,b) => a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate();
+function dayPhrase(d){ return `${DAYS[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]}`; }
+
+function agoPhrase(ts){
+  const now = Date.now(), diff = now - ts;
+  const min = diff/60000, hr = min/60, day = hr/24;
+  const d = new Date(ts), today = new Date();
+  if (min < 2)   return "just now";
+  if (min < 50)  return `about ${numWord(min)} minutes ago`;
+  if (min < 90)  return "about an hour ago";
+  if (sameDay(d, today)) return `about ${numWord(hr)} hours ago`;
+  const yest = new Date(today); yest.setDate(today.getDate()-1);
+  if (sameDay(d, yest)) return "yesterday";
+  if (day < 7)   return `${numWord(day)} days ago`;
+  if (day < 28)  return `about ${numWord(day/7)} week${day/7 >= 1.5 ? "s" : ""} ago`;
+  if (day < 340) return `about ${numWord(day/30.4)} month${day/30.4 >= 1.5 ? "s" : ""} ago`;
+  return `about ${numWord(day/365)} year${day/365 >= 1.5 ? "s" : ""} ago`;
+}
+function timeOfDayWords(d){
+  const h = d.getHours();
+  if (h < 5)  return "in the middle of the night";
+  if (h < 12) return "in the morning";
+  if (h < 17) return "in the afternoon";
+  if (h < 21) return "in the evening";
+  return "at night";
+}
+function dayHeading(ts){
+  const d = new Date(ts), today = new Date();
+  if (sameDay(d, today)) return "Today";
+  const yest = new Date(today); yest.setDate(today.getDate()-1);
+  if (sameDay(d, yest)) return "Yesterday";
+  const daysBack = (today - d) / 86400000;
+  if (daysBack < 6) return `Last ${DAYS[d.getDay()]}`;
+  return dayPhrase(d);
+}
+function clockPhrase(d){
+  const h = d.getHours() % 12 || 12, m = d.getMinutes();
+  return `${h}:${String(m).padStart(2,"0")} ${timeOfDayWords(d)}`;
+}
+function inPhrase(ms){
+  const min = ms / 60000;
+  if (min < 1.5)  return "right about now";
+  if (min < 90)   return `in about ${numWord(min)} minutes`;
+  const hr = min / 60;
+  return `in about ${numWord(hr)} hour${hr >= 1.5 ? "s" : ""}`;
+}
+function elapsedWords(ms){
+  const min = ms / 60000;
+  if (min < 2)  return "a minute or two";
+  if (min < 90) return `about ${numWord(min)} minutes`;
+  return `about ${numWord(min/60)} hour${min/60 >= 1.5 ? "s" : ""}`;
+}
+
+/* ---------- header ---------- */
+document.getElementById("day-phrase").textContent =
+  `${dayPhrase(new Date())} — ${timeOfDayWords(new Date())}`;
+
+/* ---------- collapsible cards remember their state ---------- */
+{
+  const saved = load(K.open, null);
+  const all = document.querySelectorAll("details.card[id]");
+  if (saved) all.forEach(d => d.open = saved.includes(d.id));
+  all.forEach(d => d.addEventListener("toggle", () => {
+    save(K.open, [...document.querySelectorAll("details.card[id][open]")].map(x => x.id));
+  }));
+}
+
+/* ---------- now / next slots ---------- */
+const nowSlot = document.getElementById("now-slot");
+const nextSlot = document.getElementById("next-slot");
+nowSlot.value = load(K.now, "");
+nextSlot.value = load(K.next, "");
+nowSlot.addEventListener("input", () => save(K.now, nowSlot.value));
+nextSlot.addEventListener("input", () => save(K.next, nextSlot.value));
+
+/* ---------- today strip (spoons) ---------- */
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`; };
+let dayPlan = load(K.day, null);
+if (!dayPlan || dayPlan.date !== todayKey()) dayPlan = { date: todayKey(), m:"", a:"", e:"" };
+save(K.day, dayPlan);
+[["day-m","m"],["day-a","a"],["day-e","e"]].forEach(([id, k]) => {
+  const el = document.getElementById(id);
+  el.value = dayPlan[k];
+  el.addEventListener("input", () => { dayPlan[k] = el.value; save(K.day, dayPlan); });
+});
+
+/* ---------- capture ---------- */
+const capture = document.getElementById("capture");
+function addEntry(text, extra = {}){
+  if (!text.trim()) return;
+  entries.push({ id: Date.now() + "-" + Math.random().toString(36).slice(2,7), ts: Date.now(), text: text.trim(), ...extra });
+  save(K.entries, entries);
+  render();
+}
+document.getElementById("save-btn").addEventListener("click", () => { addEntry(capture.value); capture.value = ""; capture.focus(); });
+capture.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); addEntry(capture.value); capture.value = ""; }
+});
+
+/* ---------- timeline ---------- */
+const timeline = document.getElementById("timeline");
+const searchBox = document.getElementById("search");
+searchBox.addEventListener("input", render);
+function esc(s){ return s.replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function linkTags(escaped){ return escaped.replace(/(^|\s)(#[\w-]+)/g, '$1<span class="tag" data-tag="$2">$2</span>'); }
+function render(){
+  const q = searchBox.value.trim().toLowerCase();
+  const list = entries
+    .filter(e => !q || e.text.toLowerCase().includes(q))
+    .sort((a,b) => b.ts - a.ts);
+  if (!list.length){
+    timeline.innerHTML = `<p class="empty">${entries.length ? "Nothing matches that search." :
+      "Nothing here yet. Whatever you save above becomes a memory you can actually revisit."}</p>`;
+    return;
+  }
+  let html = "", lastHead = "";
+  for (const e of list){
+    const head = dayHeading(e.ts);
+    if (head !== lastHead){ html += `<div class="day-head">${head}</div>`; lastHead = head; }
+    html += `<div class="entry">
+      <div class="when">
+        <span>${agoPhrase(e.ts)} · ${timeOfDayWords(new Date(e.ts))}${e.checkin ? ' <span class="checkin-mark">check-in</span>' : ""}</span>
+        <button class="ghost" data-del="${e.id}" title="Delete this entry">✕</button>
+      </div>
+      <div class="text">${linkTags(esc(e.text))}</div>
+    </div>`;
+  }
+  timeline.innerHTML = html;
+}
+timeline.addEventListener("click", e => {
+  const del = e.target.closest("[data-del]");
+  if (del && confirm("Delete this entry for good?")){
+    entries = entries.filter(x => x.id !== del.dataset.del);
+    save(K.entries, entries); render(); return;
+  }
+  const tag = e.target.closest("[data-tag]");
+  if (tag){ searchBox.value = tag.dataset.tag; render(); searchBox.scrollIntoView({behavior:"smooth"}); }
+});
+
+/* ---------- daily check-in ---------- */
+const ciPanel = document.getElementById("checkin-panel");
+document.getElementById("checkin-btn").addEventListener("click", () => {
+  ciPanel.classList.add("on");
+  document.getElementById("ci-did").focus();
+  ciPanel.scrollIntoView({behavior:"smooth"});
+});
+document.getElementById("ci-cancel").addEventListener("click", () => ciPanel.classList.remove("on"));
+document.getElementById("ci-save").addEventListener("click", () => {
+  const did = document.getElementById("ci-did").value.trim();
+  const who = document.getElementById("ci-who").value.trim();
+  const felt = document.getElementById("ci-felt").value.trim();
+  const win = document.getElementById("ci-win").value.trim();
+  const parts = [];
+  if (did)  parts.push("Did: " + did);
+  if (who)  parts.push("People: " + who);
+  if (felt) parts.push("Felt: " + felt);
+  if (win)  parts.push("🏆 Win: " + win);
+  if (win) logWin(win, "", { mirror: false });
+  if (parts.length){
+    addEntry(parts.join("\n"), { checkin: true });
+    ["ci-did","ci-who","ci-felt","ci-win"].forEach(id => document.getElementById(id).value = "");
+  }
+  ciPanel.classList.remove("on");
+});
+
+/* ---------- resurface ---------- */
+const rsPanel = document.getElementById("resurface-panel");
+const rsBody = document.getElementById("resurface-body");
+function resurface(){
+  const old = entries.filter(e => Date.now() - e.ts > 2 * 86400000);
+  const pool = old.length ? old : entries;
+  if (!pool.length){
+    rsBody.innerHTML = `<p class="empty">No past moments yet — future-you will thank present-you for starting.</p>`;
+  } else {
+    const e = pool[Math.floor(Math.random() * pool.length)];
+    rsBody.innerHTML = `<div class="when" style="color:var(--ink-soft);font-size:.9rem">
+        ${dayPhrase(new Date(e.ts))}, ${timeOfDayWords(new Date(e.ts))} — ${agoPhrase(e.ts)}</div>
+      <div class="text" style="margin-top:.3rem;white-space:pre-wrap">${linkTags(esc(e.text))}</div>`;
+  }
+  rsPanel.classList.add("on");
+  rsPanel.scrollIntoView({behavior:"smooth"});
+}
+document.getElementById("resurface-btn").addEventListener("click", resurface);
+document.getElementById("resurface-again").addEventListener("click", resurface);
+document.getElementById("resurface-close").addEventListener("click", () => rsPanel.classList.remove("on"));
+
+/* ---------- timer ---------- */
+const tPanel = document.getElementById("timer-panel");
+const tBar = document.getElementById("timer-bar");
+const tPhrase = document.getElementById("timer-phrase");
+let tEnd = null, tTotal = 0, tTick = null;
+function remainingPhrase(msLeft, total){
+  const frac = msLeft / total, min = msLeft / 60000;
+  if (min <= 1)      return "almost done";
+  if (frac > 0.85)   return "just started";
+  if (Math.abs(frac - 0.5) < 0.08) return "about halfway";
+  const rounded = Math.max(5, Math.round(min / 5) * 5);
+  if (min < 7) return `about five minutes left`;
+  return `about ${numWord(rounded)} minutes left`;
+}
+function chime(){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [0, .35, .7].forEach((delay, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = [660, 880, 990][i]; o.type = "sine";
+      o.connect(g); g.connect(ctx.destination);
+      const t = ctx.currentTime + delay;
+      g.gain.setValueAtTime(0.001, t);
+      g.gain.exponentialRampToValueAtTime(0.2, t + 0.05);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+      o.start(t); o.stop(t + 0.7);
+    });
+  }catch{}
+}
+function stopTimer(){
+  clearInterval(tTick); tTick = null; tEnd = null;
+  tPanel.classList.remove("on"); tBar.classList.remove("pulse");
+}
+function tickTimer(){
+  const left = tEnd - Date.now();
+  if (left <= 0){
+    tBar.style.width = "0%";
+    tPhrase.textContent = "Time's up — check your “Now” box before choosing what's next.";
+    tBar.classList.add("pulse");
+    chime();
+    clearInterval(tTick); tTick = null;
+    return;
+  }
+  tBar.style.width = (left / tTotal * 100) + "%";
+  tPhrase.textContent = remainingPhrase(left, tTotal);
+}
+document.getElementById("timer-buttons").addEventListener("click", e => {
+  const btn = e.target.closest("[data-min]");
+  if (!btn) return;
+  tTotal = Number(btn.dataset.min) * 60000;
+  tEnd = Date.now() + tTotal;
+  tPanel.classList.add("on"); tBar.classList.remove("pulse");
+  tBar.style.width = "100%";
+  tickTimer();
+  clearInterval(tTick);
+  tTick = setInterval(tickTimer, 1000);
+});
+document.getElementById("timer-stop").addEventListener("click", stopTimer);
+
+/* ---------- notifications & beeps ---------- */
+function askNotify(){
+  if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+}
+function notify(text){
+  if ("Notification" in window && Notification.permission === "granted"){
+    try{ new Notification("⚓ Anchor", { body: text }); }catch{}
+  }
+}
+function nagBeep(level){
+  try{
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const plans = [
+      { notes:[440, 550],                      gain:0.10, gap:0.30 },
+      { notes:[550, 660, 550, 660],            gain:0.18, gap:0.22 },
+      { notes:[880, 660, 880, 660, 990, 990],  gain:0.30, gap:0.16 }
+    ];
+    const p = plans[Math.min(2, level)];
+    p.notes.forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = f; o.type = level >= 2 ? "square" : "sine";
+      o.connect(g); g.connect(ctx.destination);
+      const t = ctx.currentTime + i * p.gap;
+      g.gain.setValueAtTime(0.001, t);
+      g.gain.exponentialRampToValueAtTime(p.gain, t + 0.04);
+      g.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      o.start(t); o.stop(t + 0.3);
+    });
+  }catch{}
+}
+function confetti(){
+  const emo = ["🎉","✨","💚","⭐️","🔥","🙌"];
+  for (let i = 0; i < 22; i++){
+    const s = document.createElement("span");
+    s.className = "confetti";
+    s.textContent = emo[Math.floor(Math.random()*emo.length)];
+    s.style.left = Math.random()*100 + "vw";
+    s.style.animationDelay = (Math.random()*0.4) + "s";
+    document.body.appendChild(s);
+    setTimeout(() => s.remove(), 2000);
+  }
+}
+
+/* ---------- the nagger ---------- */
+let nag = load(K.nag, null);
+let leavePlan = load(K.leave, null);
+const NAG_MODES = { nudge:{interval:240000, level:0}, nag:{interval:120000, level:1}, yell:{interval:45000, level:2} };
+const NAG_PHRASES = [
+  [ "Hey. “%s” is still waiting for you.",
+    "Gentle nudge: %s. No pressure. (Some pressure.)",
+    "Whenever you're ready: %s. Which is now. Now is good." ],
+  [ "Right — enough marinating. Time for: %s.",
+    "We both know you're not doing “%s” right now. Let's fix that.",
+    "The task “%s” called. It's feeling neglected." ],
+  [ "OI!! %s. FEET. FLOOR. NOW.",
+    "“%s” !!! FUTURE-YOU IS BEGGING YOU.",
+    "STAND UP AND DO “%s”. COUNT OF THREE. ONE — TWO —" ]
+];
+const nagStatus = document.getElementById("nag-status");
+const nagStatusText = document.getElementById("nag-status-text");
+const nagTask = document.getElementById("nag-task");
+const overlay = document.getElementById("yell-overlay");
+const yellText = document.getElementById("yell-text");
+
+function saveNag(){ nag ? save(K.nag, nag) : wipe(K.nag); }
+function saveLeave(){ leavePlan ? save(K.leave, leavePlan) : wipe(K.leave); }
+function startNag(task, mode){
+  const m = NAG_MODES[mode];
+  nag = { task, level: m.level, interval: m.interval, nextAt: Date.now() + 1000 };
+  saveNag(); askNotify(); updateNagStatus();
+}
+function stopNag(didIt){
+  if (didIt && nag) addEntry("✅ Got moving: " + nag.task);
+  nag = null; saveNag();
+  overlay.hidden = true;
+  updateNagStatus();
+}
+function fireNag(){
+  const lvl = Math.min(2, nag.level);
+  const set = NAG_PHRASES[lvl];
+  const msg = set[Math.floor(Math.random() * set.length)].replace("%s", nag.task);
+  nagBeep(lvl); notify(msg);
+  if (navigator.vibrate) try{ navigator.vibrate(lvl === 2 ? [300,120,300,120,500] : [180]); }catch{}
+  if (lvl >= 1){
+    yellText.textContent = msg;
+    overlay.classList.toggle("intense", lvl === 2);
+    overlay.hidden = false;
+  }
+  nag.level++;
+  nag.interval = Math.max(30000, Math.round(nag.interval * 0.75));
+  nag.nextAt = Date.now() + nag.interval;
+  saveNag(); updateNagStatus();
+}
+function updateNagStatus(){
+  if (!nag){ nagStatus.hidden = true; return; }
+  nagStatus.hidden = false;
+  const stage = ["nudging", "nagging", "YELLING"][Math.min(2, nag.level)];
+  nagStatusText.textContent = `Currently ${stage} you about “${nag.task}” — next one ${inPhrase(nag.nextAt - Date.now())}. It only gets louder.`;
+}
+document.getElementById("nag-buttons").addEventListener("click", e => {
+  const btn = e.target.closest("[data-mode]");
+  if (!btn) return;
+  startNag(nagTask.value.trim() || "the thing", btn.dataset.mode);
+});
+document.getElementById("nag-stop").addEventListener("click", () => stopNag(false));
+document.getElementById("yell-done").addEventListener("click", () => { stopNag(true); nagTask.value = ""; });
+document.getElementById("yell-snooze").addEventListener("click", () => {
+  if (nag){ nag.nextAt = Date.now() + 5 * 60000; saveNag(); }
+  overlay.hidden = true;
+  updateNagStatus();
+});
+
+/* ---------- when should I leave ---------- */
+let lvJourney = 20, lvFaff = 10;
+const lvResult = document.getElementById("lv-result");
+const lvArmed = document.getElementById("lv-armed");
+const lvArmedText = document.getElementById("lv-armed-text");
+function pickPreset(rowId, e, setter){
+  const btn = e.target.closest("[data-min]");
+  if (!btn) return;
+  document.querySelectorAll("#" + rowId + " button").forEach(b => b.classList.remove("sel"));
+  btn.classList.add("sel");
+  setter(Number(btn.dataset.min));
+}
+document.getElementById("lv-journey").addEventListener("click", e => pickPreset("lv-journey", e, v => lvJourney = v));
+document.getElementById("lv-faff").addEventListener("click", e => pickPreset("lv-faff", e, v => lvFaff = v));
+function computeLeave(){
+  const t = document.getElementById("lv-arrive").value;
+  if (!t){ lvResult.hidden = false; lvResult.innerHTML = `<span class="late">First tap “Be there at” and pick the time.</span>`; return null; }
+  const [h, m] = t.split(":").map(Number);
+  const arrive = new Date(); arrive.setHours(h, m, 0, 0);
+  let tomorrow = false;
+  if (arrive.getTime() < Date.now() - 60000){ arrive.setDate(arrive.getDate() + 1); tomorrow = true; }
+  const leaveAt = arrive.getTime() - (lvJourney + lvFaff) * 60000;
+  const where = document.getElementById("lv-where").value.trim();
+  return { arrive, leaveAt, tomorrow, where };
+}
+document.getElementById("lv-calc").addEventListener("click", () => {
+  const r = computeLeave();
+  if (!r) return;
+  const { arrive, leaveAt, tomorrow, where } = r;
+  const dest = where ? ` for ${where}` : "";
+  const breakdown = `${numWord(lvJourney)} minutes of journey` + (lvFaff ? ` + ${numWord(lvFaff)} minutes of faff` : "");
+  let html;
+  if (leaveAt <= Date.now()){
+    html = `<div class="big late">Leave NOW${dest}.</div>
+      <div>Honestly you're already ${agoPhrase(leaveAt).replace(" ago","").replace("just now","a moment")} behind — shoes on, go, faff later.</div>`;
+  } else {
+    html = `<div class="big">Leave by ${clockPhrase(new Date(leaveAt))}</div>
+      <div>That's ${inPhrase(leaveAt - Date.now())}${tomorrow ? " (that time is tomorrow)" : ""}.</div>
+      <div class="hint" style="margin-top:.3rem">Working: be there at ${clockPhrase(arrive)}, minus ${breakdown}.</div>
+      <div class="row" style="margin-top:.6rem"><button class="primary" id="lv-arm">⏰ Nag me when it's time to leave</button></div>`;
+  }
+  lvResult.hidden = false;
+  lvResult.innerHTML = html;
+});
+lvResult.addEventListener("click", e => {
+  if (e.target.id !== "lv-arm") return;
+  const r = computeLeave();
+  if (!r || r.leaveAt <= Date.now()) return;
+  const task = "leave" + (r.where ? " for " + r.where : "");
+  leavePlan = { task, leaveAt: r.leaveAt, warnAt: r.leaveAt - 10 * 60000, warned: r.leaveAt - 10 * 60000 <= Date.now() };
+  saveLeave(); askNotify(); updateLeaveStatus();
+  lvResult.hidden = true;
+});
+document.getElementById("lv-cancel").addEventListener("click", () => { leavePlan = null; saveLeave(); updateLeaveStatus(); });
+function updateLeaveStatus(){
+  if (!leavePlan){ lvArmed.hidden = true; return; }
+  lvArmed.hidden = false;
+  lvArmedText.textContent = `Armed: I'll warn you around ${clockPhrase(new Date(leavePlan.warnAt))} and yell at ${clockPhrase(new Date(leavePlan.leaveAt))} (${inPhrase(leavePlan.leaveAt - Date.now())}). Keep this tab open.`;
+}
+
+/* ---------- task shredder ---------- */
+let shred = load(K.shred, null);   // {task, steps:[{text,done}], idx, active}
+let draftSteps = [];
+const shredSetup = document.getElementById("shred-setup");
+const shredBuilder = document.getElementById("shred-builder");
+const shredBeginRow = document.getElementById("shred-begin-row");
+const shredListEl = document.getElementById("shred-list");
+const shredOverlay = document.getElementById("shred-overlay");
+const shredResume = document.getElementById("shred-resume");
+const shredResumeText = document.getElementById("shred-resume-text");
+
+function saveShred(){ shred ? save(K.shred, shred) : wipe(K.shred); }
+function renderDraft(){
+  shredListEl.innerHTML = draftSteps.map((s, i) =>
+    `<div class="row" style="padding:.2rem 0"><span class="grow">${numWord(i+1)}. ${esc(s)}</span>
+     <button class="ghost" data-rm="${i}">✕</button></div>`).join("");
+}
+shredListEl.addEventListener("click", e => {
+  const rm = e.target.closest("[data-rm]");
+  if (rm){ draftSteps.splice(Number(rm.dataset.rm), 1); renderDraft(); }
+});
+document.getElementById("shred-begin").addEventListener("click", () => {
+  if (!document.getElementById("shred-task").value.trim()) return;
+  shredBuilder.hidden = false; shredBeginRow.hidden = true;
+  document.getElementById("shred-step-input").focus();
+});
+document.getElementById("shred-step-input").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  e.preventDefault();
+  const v = e.target.value.trim();
+  if (v){ draftSteps.push(v); e.target.value = ""; renderDraft(); }
+});
+document.getElementById("shred-scrap").addEventListener("click", resetShredUI);
+function resetShredUI(){
+  draftSteps = [];
+  document.getElementById("shred-task").value = "";
+  renderDraft();
+  shredBuilder.hidden = true; shredBeginRow.hidden = false;
+}
+document.getElementById("shred-start").addEventListener("click", () => {
+  const pending = document.getElementById("shred-step-input").value.trim();
+  if (pending){ draftSteps.push(pending); document.getElementById("shred-step-input").value = ""; }
+  if (!draftSteps.length) return;
+  shred = { task: document.getElementById("shred-task").value.trim(), steps: draftSteps.map(t => ({text:t, done:false})), idx: 0, active: true };
+  saveShred(); resetShredUI(); showShredStep();
+});
+function showShredStep(){
+  if (!shred) return;
+  const total = shred.steps.length;
+  if (shred.idx >= total){
+    document.getElementById("shred-count").textContent = "";
+    document.getElementById("shred-step").textContent = `THE WHOLE THING IS DONE 🎉 “${shred.task}” — shredded.`;
+    document.getElementById("shred-done").hidden = true;
+    document.getElementById("shred-smaller").hidden = true;
+    document.getElementById("shred-pause").textContent = "close 🎉";
+    addEntry(`⚡ Shredded the whole thing: ${shred.task} (${numWord(total)} steps)`);
+    confetti(); nagBeep(0);
+    shred = null; saveShred(); updateShredResume();
+    return;
+  }
+  document.getElementById("shred-done").hidden = false;
+  document.getElementById("shred-smaller").hidden = false;
+  document.getElementById("shred-pause").textContent = "pause";
+  document.getElementById("shred-count").textContent = `Step ${numWord(shred.idx+1)} of ${numWord(total)} — “${shred.task}”`;
+  document.getElementById("shred-step").textContent = shred.steps[shred.idx].text;
+  document.getElementById("shred-smaller-row").hidden = true;
+  shredOverlay.hidden = false;
+}
+document.getElementById("shred-done").addEventListener("click", () => {
+  if (!shred) return;
+  shred.steps[shred.idx].done = true;
+  shred.idx++;
+  saveShred(); confetti();
+  showShredStep();
+});
+document.getElementById("shred-smaller").addEventListener("click", () => {
+  const row = document.getElementById("shred-smaller-row");
+  row.hidden = false;
+  document.getElementById("shred-smaller-input").focus();
+});
+document.getElementById("shred-smaller-input").addEventListener("keydown", e => {
+  if (e.key !== "Enter" || !shred) return;
+  e.preventDefault();
+  const v = e.target.value.trim();
+  if (!v) return;
+  shred.steps.splice(shred.idx, 0, {text: v, done:false});
+  e.target.value = "";
+  saveShred(); showShredStep();
+});
+document.getElementById("shred-pause").addEventListener("click", () => {
+  shredOverlay.hidden = true;
+  updateShredResume();
+});
+document.getElementById("shred-resume-btn").addEventListener("click", showShredStep);
+document.getElementById("shred-abandon").addEventListener("click", () => {
+  shred = null; saveShred(); updateShredResume();
+});
+function updateShredResume(){
+  if (shred && shred.active && shredOverlay.hidden){
+    shredResume.hidden = false;
+    shredSetup.hidden = true;
+    const left = shred.steps.length - shred.idx;
+    shredResumeText.textContent = `Paused: “${shred.task}” — ${numWord(left)} step${left === 1 ? "" : "s"} left.`;
+  } else {
+    shredResume.hidden = true;
+    shredSetup.hidden = false;
+  }
+}
+
+/* ---------- body double ---------- */
+let bd = load(K.bd, null);   // {task, startedAt, lastCheck, awaiting}
+const bdBanner = document.getElementById("bd-banner");
+const bdText = document.getElementById("bd-text");
+const bdYep = document.getElementById("bd-yep");
+const bdDrift = document.getElementById("bd-drift");
+const BD_CHECK_MS = 5 * 60000;
+function saveBd(){ bd ? save(K.bd, bd) : wipe(K.bd); }
+document.getElementById("bd-start").addEventListener("click", () => {
+  const task = document.getElementById("bd-task").value.trim() || nowSlot.value.trim() || "the thing";
+  bd = { task, startedAt: Date.now(), lastCheck: Date.now(), awaiting: false };
+  saveBd(); askNotify(); updateBdBanner();
+});
+document.getElementById("bd-done").addEventListener("click", () => {
+  if (bd) addEntry(`👥 Body-double session: ${bd.task} — ${elapsedWords(Date.now() - bd.startedAt)}`);
+  bd = null; saveBd(); updateBdBanner();
+  confetti();
+});
+bdYep.addEventListener("click", () => {
+  if (!bd) return;
+  bd.awaiting = false; bd.lastCheck = Date.now(); saveBd(); updateBdBanner("nice. keep going 💚");
+});
+bdDrift.addEventListener("click", () => {
+  if (!bd) return;
+  bd.awaiting = false; bd.lastCheck = Date.now(); saveBd();
+  updateBdBanner(`no shame — eyes back on: ${bd.task}. smallest next move.`);
+});
+let bdFlashUntil = 0, bdFlashMsg = "";
+function updateBdBanner(flash){
+  if (flash){ bdFlashMsg = flash; bdFlashUntil = Date.now() + 6000; }
+  if (!bd){ bdBanner.hidden = true; return; }
+  bdBanner.hidden = false;
+  bdBanner.classList.toggle("ask", bd.awaiting);
+  bdYep.hidden = bdDrift.hidden = !bd.awaiting;
+  if (bd.awaiting){
+    bdText.textContent = `👀 Still on “${bd.task}”?`;
+  } else if (Date.now() < bdFlashUntil){
+    bdText.textContent = bdFlashMsg;
+  } else {
+    bdText.textContent = `👥 On it together: “${bd.task}” — started ${elapsedWords(Date.now() - bd.startedAt)} ago.`;
+  }
+}
+
+/* ---------- body stuff daemon ---------- */
+const BODY_DEFS = [
+  { k:"ate",   btn:"🍜 I ate",          label:"eaten",       every: 4*3600000,  msg:"It's been about four hours since you told me you ate. Snack?" },
+  { k:"drank", btn:"💧 I drank water",  label:"drunk water", every: 90*60000,   msg:"Water check 💧 — it's been about an hour and a half." },
+  { k:"stood", btn:"🧍 I stood up",     label:"stood up",    every: 3600000,    msg:"Unfold yourself 🧍 — it's been about an hour of sitting." },
+  { k:"meds",  btn:"💊 Took meds",      label:"taken meds",  every: 20*3600000, msg:"Meds check 💊 — nearly a day since you last logged them." }
+];
+const BODY_LOG = { ate:"🍜 Ate", drank:"💧 Water", stood:"🧍 Stood up + stretched", meds:"💊 Took meds" };
+let body = load(K.body, { last:{}, on:{ate:true, drank:true, stood:true, meds:false}, lastNag:{} });
+const bodyRows = document.getElementById("body-rows");
+function renderBody(){
+  bodyRows.innerHTML = BODY_DEFS.map(d => {
+    const last = body.last[d.k];
+    const status = last ? `last ${d.label}: ${agoPhrase(last)}` : "not armed yet — tap once";
+    return `<div class="row" style="padding:.35rem 0">
+      <button data-body="${d.k}">${d.btn}</button>
+      <span class="grow hint" style="margin:0">${status}</span>
+      <label style="font-size:.82rem;color:var(--ink-soft);white-space:nowrap">
+        <input type="checkbox" data-bodyon="${d.k}" ${body.on[d.k] ? "checked" : ""}> nag me
+      </label>
+    </div>`;
+  }).join("");
+}
+bodyRows.addEventListener("click", e => {
+  const b = e.target.closest("[data-body]");
+  if (b){
+    const k = b.dataset.body;
+    body.last[k] = Date.now();
+    delete body.lastNag[k];
+    save(K.body, body);
+    addEntry(BODY_LOG[k]);
+    renderBody();
+  }
+});
+bodyRows.addEventListener("change", e => {
+  const c = e.target.closest("[data-bodyon]");
+  if (c){
+    body.on[c.dataset.bodyon] = c.checked;
+    save(K.body, body);
+    if (c.checked) askNotify();
+  }
+});
+renderBody();
+
+/* ---------- people file ---------- */
+let people = load(K.people, []);   // [{id, name, notes, updated}]
+const peopleList = document.getElementById("people-list");
+const personSearch = document.getElementById("person-search");
+function savePeople(){ save(K.people, people); }
+function renderPeople(){
+  const q = personSearch.value.trim().toLowerCase();
+  const list = people
+    .filter(p => !q || p.name.toLowerCase().includes(q) || p.notes.toLowerCase().includes(q))
+    .sort((a,b) => b.updated - a.updated);
+  if (!list.length){
+    peopleList.innerHTML = `<p class="empty">${people.length ? "No one matches." : "No dossiers yet. Add the people you always blank on."}</p>`;
+    return;
+  }
+  peopleList.innerHTML = list.map(p => `
+    <div class="person" data-pid="${p.id}">
+      <div class="p-head">
+        <span class="p-name">${esc(p.name)}</span>
+        <span class="p-when">updated ${agoPhrase(p.updated)}</span>
+      </div>
+      <div class="p-body">
+        <textarea data-pnotes="${p.id}" rows="4" placeholder="how I know them · what we last talked about · things I promised · their kid/dog/band">${esc(p.notes)}</textarea>
+        <div class="row" style="margin-top:.4rem">
+          <button class="primary" data-psave="${p.id}">Save</button>
+          <button class="ghost" data-pdel="${p.id}">delete</button>
+        </div>
+      </div>
+    </div>`).join("");
+}
+personSearch.addEventListener("input", renderPeople);
+document.getElementById("person-add").addEventListener("click", () => {
+  const name = personSearch.value.trim();
+  if (!name){ personSearch.focus(); return; }
+  people.push({ id: Date.now() + "-" + Math.random().toString(36).slice(2,5), name, notes:"", updated: Date.now() });
+  savePeople();
+  personSearch.value = "";
+  renderPeople();
+  const el = peopleList.querySelector(".person");
+  if (el){ el.classList.add("open"); el.querySelector("textarea").focus(); }
+});
+peopleList.addEventListener("click", e => {
+  const del = e.target.closest("[data-pdel]");
+  if (del && confirm("Delete this dossier?")){
+    people = people.filter(p => p.id !== del.dataset.pdel);
+    savePeople(); renderPeople(); return;
+  }
+  const sv = e.target.closest("[data-psave]");
+  if (sv){
+    const p = people.find(x => x.id === sv.dataset.psave);
+    const ta = peopleList.querySelector(`[data-pnotes="${sv.dataset.psave}"]`);
+    if (p && ta){ p.notes = ta.value; p.updated = Date.now(); savePeople(); renderPeople(); }
+    return;
+  }
+  const head = e.target.closest(".p-head");
+  if (head) head.closest(".person").classList.toggle("open");
+});
+renderPeople();
+
+/* ---------- work wins (brag file) ---------- */
+let wins = load(K.wins, []);   // [{id, ts, text, impact, kudos}]
+let winsMeta = load(K.winsMeta, { on: true, baseline: Date.now(), lastNag: 0 });
+if (!winsMeta.baseline) winsMeta.baseline = Date.now();
+save(K.winsMeta, winsMeta);
+const winsListEl = document.getElementById("wins-list");
+const winText = document.getElementById("win-text");
+const winImpact = document.getElementById("win-impact");
+function saveWins(){ save(K.wins, wins); }
+function saveWinsMeta(){ save(K.winsMeta, winsMeta); }
+function monthHead(ts){ const d = new Date(ts); return `${MONTHS[d.getMonth()]} ${d.getFullYear()}`; }
+function renderWins(){
+  const list = [...wins].sort((a,b) => b.ts - a.ts);
+  if (!list.length){
+    winsListEl.innerHTML = `<p class="empty">Nothing logged yet. Next time someone says “nice one” — or you quietly fix a thing nobody saw — it goes here. Small counts.</p>`;
+    return;
+  }
+  let html = `<p class="hint" style="margin-top:.7rem">${numWord(list.length)} win${list.length === 1 ? "" : "s"} on record.</p>`, lastHead = "";
+  for (const w of list){
+    const head = monthHead(w.ts);
+    if (head !== lastHead){ html += `<div class="day-head">${head}</div>`; lastHead = head; }
+    html += `<div class="entry">
+      <div class="when">
+        <span>${agoPhrase(w.ts)}</span>
+        <button class="ghost" data-windel="${w.id}" title="Delete this win">✕</button>
+      </div>
+      <div class="text">${w.kudos ? `💬 “${esc(w.text)}”` : `🏆 ${esc(w.text)}`}${w.impact ? `<div class="hint" style="margin:.15rem 0 0">↳ ${esc(w.impact)}</div>` : ""}</div>
+    </div>`;
+  }
+  winsListEl.innerHTML = html;
+}
+function logWin(text, impact, opts = {}){
+  wins.push({ id: Date.now() + "-" + Math.random().toString(36).slice(2,7), ts: Date.now(), text, impact, kudos: !!opts.kudos });
+  saveWins();
+  if (opts.mirror !== false){
+    addEntry(opts.kudos ? `💬 Kudos: “${text}”` + (impact ? ` — ${impact}` : "")
+                        : "🏆 Work win: " + text + (impact ? ` — ${impact}` : ""));
+  }
+  confetti();
+  renderWins();
+}
+function addWin(kudos){
+  const text = winText.value.trim();
+  if (!text){ winText.focus(); return; }
+  logWin(text, winImpact.value.trim(), { kudos });
+  winText.value = ""; winImpact.value = "";
+  winText.focus();
+}
+document.getElementById("win-save").addEventListener("click", () => addWin(false));
+document.getElementById("kudos-save").addEventListener("click", () => addWin(true));
+[winText, winImpact].forEach(el => el.addEventListener("keydown", e => {
+  if (e.key === "Enter"){ e.preventDefault(); addWin(false); }
+}));
+winsListEl.addEventListener("click", e => {
+  const del = e.target.closest("[data-windel]");
+  if (del && confirm("Delete this win? (It still happened. It still counts.)")){
+    wins = wins.filter(w => w.id !== del.dataset.windel);
+    saveWins(); renderWins();
+  }
+});
+let winsRangeMo = 0;   // 0 = everything
+const WINS_RANGE_LABEL = { 3:"the last three months", 6:"the last six months", 12:"the last year", 0:"everything so far" };
+document.getElementById("wins-range").addEventListener("click", e => {
+  const b = e.target.closest("[data-mo]");
+  if (!b) return;
+  document.querySelectorAll("#wins-range button").forEach(x => x.classList.remove("sel"));
+  b.classList.add("sel");
+  winsRangeMo = Number(b.dataset.mo);
+});
+function winsInRange(){
+  const cutoff = winsRangeMo ? Date.now() - winsRangeMo * 30.4 * 86400000 : 0;
+  return wins.filter(w => w.ts >= cutoff).sort((a,b) => b.ts - a.ts);
+}
+function winsAsText(){
+  const list = winsInRange();
+  let out = `My work wins — ${WINS_RANGE_LABEL[winsRangeMo]}, copied ${dayPhrase(new Date())}\n`, lastHead = "";
+  for (const w of list){
+    const head = monthHead(w.ts);
+    if (head !== lastHead){ out += `\n${head}\n`; lastHead = head; }
+    const d = new Date(w.ts);
+    const line = w.kudos ? `“${w.text}”${w.impact ? ` — ${w.impact}` : ""}` : `${w.text}${w.impact ? ` — ${w.impact}` : ""}`;
+    out += `• ${line} (${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()})\n`;
+  }
+  return out;
+}
+document.getElementById("wins-copy").addEventListener("click", async () => {
+  if (!wins.length){ alert("No wins logged yet — nothing to copy. Go do something small and come back."); return; }
+  if (!winsInRange().length){ alert(`Nothing logged in ${WINS_RANGE_LABEL[winsRangeMo]} — try “everything”.`); return; }
+  const out = winsAsText();
+  let copied = false;
+  try{ await navigator.clipboard.writeText(out); copied = true; }catch{}
+  if (!copied){
+    const ta = document.createElement("textarea");
+    ta.value = out;
+    ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try{ copied = document.execCommand("copy"); }catch{}
+    ta.remove();
+  }
+  alert(copied ? "Copied — paste it straight into your review doc or an email to your manager."
+               : "Couldn't reach the clipboard on this browser — use “Download a backup” instead.");
+});
+const winsNagOn = document.getElementById("wins-nagon");
+winsNagOn.checked = winsMeta.on;
+winsNagOn.addEventListener("change", () => {
+  winsMeta.on = winsNagOn.checked;
+  if (winsMeta.on){ winsMeta.lastNag = 0; askNotify(); }
+  saveWinsMeta();
+});
+renderWins();
+
+/* ---------- money lens ---------- */
+let money = load(K.money, { symbol:"£", coffee:4, takeaway:20, wage:null });
+const mFields = [["m-symbol","symbol"],["m-coffee","coffee"],["m-takeaway","takeaway"],["m-wage","wage"]];
+mFields.forEach(([id, k]) => {
+  const el = document.getElementById(id);
+  el.value = money[k] ?? "";
+  el.addEventListener("input", () => {
+    money[k] = k === "symbol" ? (el.value || "£") : (el.value === "" ? null : Number(el.value));
+    save(K.money, money);
+  });
+});
+const moneyResult = document.getElementById("money-result");
+function fmtMoney(x){
+  const s = money.symbol || "£";
+  const v = Math.round(x * 100) / 100;
+  return s + (Number.isInteger(v) ? v : v.toFixed(2));
+}
+function roughly(x, unit, units){
+  if (x < 0.75) return `less than one ${unit}`;
+  const n = Math.round(x);
+  return `about ${numWord(n)} ${n === 1 ? unit : units}`;
+}
+function getAmt(){
+  const v = parseFloat(document.getElementById("money-amt").value.replace(/[^\d.]/g,""));
+  if (isNaN(v) || v <= 0){
+    moneyResult.hidden = false;
+    moneyResult.innerHTML = `<span class="late">Type an amount first — just the number, e.g. 35</span>`;
+    return null;
+  }
+  return v;
+}
+document.getElementById("money-go").addEventListener("click", () => {
+  const v = getAmt(); if (v == null) return;
+  const lines = [`<div class="big">${fmtMoney(v)} is…</div>`];
+  if (money.coffee)   lines.push(`<div>☕ ${roughly(v / money.coffee, "coffee", "coffees")}</div>`);
+  if (money.takeaway) lines.push(`<div>🍕 ${roughly(v / money.takeaway, "takeaway", "takeaways")}</div>`);
+  if (money.wage)     lines.push(`<div>⏱ ${roughly(v / money.wage, "hour of your pay", "hours of your pay")}</div>`);
+  moneyResult.hidden = false;
+  moneyResult.innerHTML = lines.join("");
+});
+document.getElementById("money-split").addEventListener("click", e => {
+  const b = e.target.closest("[data-n]"); if (!b) return;
+  const v = getAmt(); if (v == null) return;
+  const n = Number(b.dataset.n), each = v / n;
+  moneyResult.hidden = false;
+  moneyResult.innerHTML = `<div class="big">${fmtMoney(each)} each</div>
+    <div>${fmtMoney(v)} split between ${numWord(n)} people — call it ${fmtMoney(Math.ceil(each))} each and stop thinking about it.</div>`;
+});
+document.getElementById("money-tip").addEventListener("click", e => {
+  const b = e.target.closest("[data-p]"); if (!b) return;
+  const v = getAmt(); if (v == null) return;
+  const p = Number(b.dataset.p), tip = v * p / 100;
+  moneyResult.hidden = false;
+  moneyResult.innerHTML = `<div class="big">${fmtMoney(v + tip)} total</div>
+    <div>that's the ${fmtMoney(v)} plus a ${fmtMoney(tip)} tip — or just leave ${fmtMoney(Math.ceil(v + tip))} and be done.</div>`;
+});
+
+/* ---------- panic button ---------- */
+const panicOverlay = document.getElementById("panic-overlay");
+document.getElementById("panic-btn").addEventListener("click", () => {
+  const items = [];
+  const add = (label, text) => items.push(`<div class="plot-item"><div class="plot-label">${label}</div><div>${text}</div></div>`);
+  add("Now, you were…", nowSlot.value.trim() ? esc(nowSlot.value) : "— nothing written down. Pick ONE thing and write it in the Now box.");
+  if (nextSlot.value.trim()) add("After that", esc(nextSlot.value));
+  if (nag) add("Active nag", `“${esc(nag.task)}” — it will go off ${inPhrase(nag.nextAt - Date.now())}.`);
+  if (leavePlan) add("Leaving soon", `You need to ${esc(leavePlan.task)} at ${clockPhrase(new Date(leavePlan.leaveAt))} — ${inPhrase(leavePlan.leaveAt - Date.now())}.`);
+  if (bd) add("Body double", `You're mid-session on “${esc(bd.task)}”, started ${elapsedWords(Date.now() - bd.startedAt)} ago.`);
+  if (shred) add("Shredder", `Mid-shred on “${esc(shred.task)}” — current step: ${esc(shred.steps[shred.idx]?.text ?? "")}`);
+  const todays = [dayPlan.m && "Morning: " + dayPlan.m, dayPlan.a && "Afternoon: " + dayPlan.a, dayPlan.e && "Evening: " + dayPlan.e].filter(Boolean);
+  if (todays.length) add("Today's big things", esc(todays.join(" · ")));
+  const recent = [...entries].sort((a,b) => b.ts - a.ts).slice(0,3);
+  if (recent.length) add("Last things you wrote down",
+    recent.map(e => `<div style="margin:.15rem 0">· ${esc(e.text.split("\n")[0]).slice(0,90)} <span style="color:var(--ink-soft);font-size:.82rem">(${agoPhrase(e.ts)})</span></div>`).join(""));
+  document.getElementById("panic-body").innerHTML = items.join("");
+  panicOverlay.hidden = false;
+});
+document.getElementById("panic-close").addEventListener("click", () => panicOverlay.hidden = true);
+
+/* ---------- one-second heartbeat ---------- */
+setInterval(() => {
+  const now = Date.now();
+  if (nag){
+    if (now >= nag.nextAt) fireNag();
+    else updateNagStatus();
+  }
+  if (leavePlan){
+    if (now > leavePlan.leaveAt + 3 * 3600000){
+      leavePlan = null; saveLeave(); updateLeaveStatus();
+    } else if (now >= leavePlan.leaveAt){
+      const task = leavePlan.task;
+      leavePlan = null; saveLeave(); updateLeaveStatus();
+      startNag(task.toUpperCase(), "yell");
+    } else {
+      if (!leavePlan.warned && now >= leavePlan.warnAt){
+        leavePlan.warned = true; saveLeave();
+        nagBeep(1);
+        notify(`About ten minutes until you need to ${leavePlan.task}. Shoes. Keys. Water.`);
+      }
+      updateLeaveStatus();
+    }
+  }
+  if (bd){
+    if (!bd.awaiting && now - bd.lastCheck > BD_CHECK_MS){
+      bd.awaiting = true; saveBd();
+      nagBeep(0);
+      notify(`Still on: ${bd.task}?`);
+    }
+    updateBdBanner();
+  }
+  for (const d of BODY_DEFS){
+    if (!body.on[d.k] || !body.last[d.k]) continue;
+    const overdue = now - body.last[d.k] > d.every;
+    const recentlyNagged = body.lastNag[d.k] && now - body.lastNag[d.k] < 20 * 60000;
+    if (overdue && !recentlyNagged){
+      body.lastNag[d.k] = now;
+      save(K.body, body);
+      nagBeep(0);
+      notify(d.msg);
+    }
+  }
+  if (winsMeta.on){
+    const lastWin = wins.length ? wins.reduce((m,w) => Math.max(m, w.ts), 0) : winsMeta.baseline;
+    const overdue = now - lastWin > 7 * 86400000;
+    const recentlyNagged = winsMeta.lastNag && now - winsMeta.lastNag < 24 * 3600000;
+    if (overdue && !recentlyNagged){
+      winsMeta.lastNag = now;
+      saveWinsMeta();
+      nagBeep(0);
+      notify("🏆 A week since your last logged work win. You did something — even “kept it all running” counts. Thirty seconds, future-you says thanks.");
+    }
+  }
+}, 1000);
+updateNagStatus();
+updateLeaveStatus();
+updateShredResume();
+updateBdBanner();
+
+/* ---------- backup ---------- */
+document.getElementById("export-btn").addEventListener("click", () => {
+  const data = { entries, now: nowSlot.value, next: nextSlot.value, people, money, day: dayPlan, body, wins, winsMeta };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  const d = new Date();
+  a.download = `anchor-backup-${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+document.getElementById("import-btn").addEventListener("click", () => document.getElementById("import-file").click());
+document.getElementById("import-file").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try{
+    const data = JSON.parse(await file.text());
+    if (!Array.isArray(data.entries)) throw new Error("bad file");
+    const known = new Set(entries.map(x => x.id));
+    for (const en of data.entries) if (!known.has(en.id)) entries.push(en);
+    save(K.entries, entries);
+    if (Array.isArray(data.people)){
+      const kp = new Set(people.map(p => p.id));
+      for (const p of data.people) if (!kp.has(p.id)) people.push(p);
+      savePeople(); renderPeople();
+    }
+    if (Array.isArray(data.wins)){
+      const kw = new Set(wins.map(w => w.id));
+      for (const w of data.wins) if (!kw.has(w.id)) wins.push(w);
+      saveWins(); renderWins();
+    }
+    if (data.winsMeta && typeof data.winsMeta.on === "boolean"){
+      winsMeta.on = data.winsMeta.on;
+      saveWinsMeta();
+      winsNagOn.checked = winsMeta.on;
+    }
+    if (data.money && typeof data.money === "object"){ money = { ...money, ...data.money }; save(K.money, money); mFields.forEach(([id,k]) => document.getElementById(id).value = money[k] ?? ""); }
+    if (data.now  && !nowSlot.value)  { nowSlot.value  = data.now;  save(K.now, data.now); }
+    if (data.next && !nextSlot.value) { nextSlot.value = data.next; save(K.next, data.next); }
+    render();
+    alert("Backup restored — everything was merged, nothing was overwritten.");
+  }catch{
+    alert("That file doesn't look like an Anchor backup.");
+  }
+  e.target.value = "";
+});
+
+/* ---------- keep phrases fresh ---------- */
+setInterval(() => { render(); renderBody(); renderPeople(); renderWins(); }, 60000);
+render();
+</script>
+</body>
+</html>

@@ -1,0 +1,2063 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Ledger — learning Python without pictures or episodes</title>
+<style>
+/* ────────────────────────────────────────────────────────────
+   THE LEDGER — learning Python without pictures or episodes
+
+   Most programming tutorials lean on two things the author
+   assumes you have: a mind's eye ("picture a box holding a
+   value", "visualise the stack") and a re-livable past
+   ("remember when we did loops last week?").
+
+   If you have aphantasia, the first is empty. If you have SDAM,
+   the second is empty. Neither absence stops you learning Python
+   — semantic memory, rules, structure, language: all intact. But
+   the *scaffolding* has to change.
+
+   So this file:
+     · never says "imagine" or "picture". Every claim is a rule
+       stated in words, and every rule that could have been a
+       mental picture is rendered on screen instead — the live
+       table of names and values after every run, the structure
+       readout of your own indentation. Externalised, not
+       imagined.
+     · never says "remember when". Each lesson restates its
+       prerequisites in full. Nothing depends on re-living an
+       earlier session.
+     · keeps the ledger. Every run you ever make is written down
+       with its timestamp and its output. Your past is a document
+       you can open, not a scene you have to reconstruct.
+     · contains no arithmetic. No FizzBuzz, no fibonacci, no
+       times tables. Numbers appear only where Python itself
+       needs them, and the page always shows the result.
+     · has no streaks, no timers, no penalties, no confetti.
+       Nothing is locked. Every lesson states its length up
+       front. You may leave in the middle of anything.
+
+   Real CPython, compiled to WebAssembly, running in the tab.
+   Not a simulation of Python — Python.
+   ──────────────────────────────────────────────────────────── */
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:    #0a0908;
+    --panel: #12100e;
+    --panel2:#181512;
+    --edge:  #2a2521;
+    --ink:   #c8c0b8;
+    --dim:   rgba(200,192,184,0.42);
+    --dimmer:rgba(200,192,184,0.22);
+    --teal:  #5ba8a0;
+    --warm:  #e85d45;
+    --amber: #d9a05b;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+    --text: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", sans-serif;
+  }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: var(--text); font-size: 16px; line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--teal); }
+
+  /* ── shell ─────────────────────────────────────────────── */
+  #shell { display: flex; min-height: 100vh; align-items: stretch; }
+  #rail {
+    width: 260px; flex: 0 0 260px; border-right: 1px solid var(--edge);
+    background: var(--panel); padding: 22px 0 40px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  #main { flex: 1 1 auto; min-width: 0; padding: 32px 40px 140px; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+
+  #brand { padding: 0 20px 18px; border-bottom: 1px solid var(--edge); margin-bottom: 14px; }
+  #brand h1 { font-size: 15px; font-weight: 600; letter-spacing: 0.02em; }
+  #brand p { font-size: 12px; color: var(--dim); line-height: 1.45; margin-top: 4px; }
+
+  .railsec { font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+             color: var(--dimmer); padding: 16px 20px 6px; }
+  .navitem {
+    display: flex; gap: 10px; align-items: baseline; width: 100%;
+    padding: 7px 20px; background: none; border: 0; text-align: left;
+    color: var(--dim); font: inherit; font-size: 13.5px; cursor: pointer;
+    border-left: 2px solid transparent;
+  }
+  .navitem:hover { color: var(--ink); background: rgba(255,255,255,0.022); }
+  .navitem.on { color: var(--ink); border-left-color: var(--teal); background: rgba(91,168,160,0.06); }
+  .navitem .num { font-family: var(--mono); font-size: 11px; color: var(--dimmer); flex: 0 0 18px; }
+  .navitem.done .num { color: var(--teal); }
+  .navitem .lbl { flex: 1 1 auto; }
+  .navitem .tick { color: var(--teal); font-size: 11px; }
+  .navitem.started .tick { color: var(--amber); }
+
+  /* ── typography ────────────────────────────────────────── */
+  h2.lesson-title { font-size: 27px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; }
+  .kicker { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em;
+            text-transform: uppercase; color: var(--dimmer); margin-bottom: 9px; }
+  .meta { color: var(--dim); font-size: 13px; margin-top: 10px; }
+  p.body { margin: 15px 0; }
+  code.inl { font-family: var(--mono); font-size: 0.885em; background: #1d1916;
+             border: 1px solid var(--edge); border-radius: 3px; padding: 1px 5px; color: #ddd4ca; }
+  strong { color: #ece4da; font-weight: 600; }
+  em { color: var(--dim); font-style: italic; }
+
+  .box { border-left: 2px solid var(--edge); background: var(--panel);
+         padding: 13px 16px; margin: 18px 0; border-radius: 0 4px 4px 0; }
+  .box .tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em;
+              text-transform: uppercase; display: block; margin-bottom: 5px; }
+  .box.rule  { border-left-color: var(--teal); }
+  .box.rule .tag { color: var(--teal); }
+  .box.warn  { border-left-color: var(--warm); }
+  .box.warn .tag { color: var(--warm); }
+  .box.note  { border-left-color: var(--amber); }
+  .box.note .tag { color: var(--amber); }
+  .box.known { border-left-color: var(--dimmer); background: transparent;
+               border: 1px dashed var(--edge); border-radius: 4px; }
+  .box.known .tag { color: var(--dimmer); }
+  .box.known ul { margin: 0; padding-left: 18px; }
+  .box.known li { margin: 3px 0; font-size: 14.5px; color: var(--dim); }
+  .box p { margin: 0; }
+  .box p + p { margin-top: 8px; }
+
+  ul.plain { margin: 14px 0 14px 20px; }
+  ul.plain li { margin: 5px 0; }
+
+  table.grid { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14px; }
+  table.grid th, table.grid td { text-align: left; padding: 7px 10px;
+      border-bottom: 1px solid var(--edge); vertical-align: top; }
+  table.grid th { color: var(--dimmer); font-weight: 500; font-size: 11px;
+      letter-spacing: 0.1em; text-transform: uppercase; }
+  table.grid td:first-child { font-family: var(--mono); font-size: 12.5px; color: var(--amber); white-space: nowrap; }
+
+  /* ── code cells ────────────────────────────────────────── */
+  .cell { border: 1px solid var(--edge); border-radius: 5px; background: var(--panel);
+          margin: 20px 0; overflow: hidden; }
+  .cell.exercise { border-color: #35302a; }
+  .cellhead { display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+              border-bottom: 1px solid var(--edge); background: var(--panel2); }
+  .cellhead .ctag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+                    text-transform: uppercase; color: var(--dimmer); flex: 1 1 auto; }
+  .cellhead .ctag.ex { color: var(--amber); }
+  .cellhead .ctag.ok { color: var(--teal); }
+  .prompt { padding: 13px 14px; border-bottom: 1px solid var(--edge); font-size: 15px; }
+  .prompt p { margin: 0; }
+  .prompt p + p { margin-top: 8px; }
+
+  textarea.editor {
+    display: block; width: 100%; border: 0; outline: 0; resize: vertical;
+    background: #0e0c0a; color: #ddd4ca; font-family: var(--mono);
+    font-size: 13.5px; line-height: 1.62; padding: 12px 14px; tab-size: 4;
+    min-height: 76px; white-space: pre; overflow-x: auto;
+  }
+  textarea.editor:focus { background: #100e0b; }
+  textarea.inputs {
+    display: block; width: 100%; border: 0; border-top: 1px solid var(--edge);
+    outline: 0; resize: vertical; background: #0c0b09; color: var(--amber);
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.6; padding: 8px 14px;
+    min-height: 30px;
+  }
+  .inputlbl { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+              text-transform: uppercase; color: var(--dimmer); padding: 7px 14px 0;
+              border-top: 1px solid var(--edge); background: #0c0b09; }
+
+  .cellbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+             padding: 9px 12px; border-top: 1px solid var(--edge); background: var(--panel2); }
+  .spacer { flex: 1 1 auto; }
+
+  button.btn {
+    font: inherit; font-size: 12.5px; padding: 5px 13px; border-radius: 4px;
+    border: 1px solid var(--edge); background: #1c1815; color: var(--ink);
+    cursor: pointer; line-height: 1.5;
+  }
+  button.btn:hover { background: #262019; border-color: #3d3630; }
+  button.btn:disabled { opacity: 0.4; cursor: default; }
+  button.btn.run { border-color: rgba(91,168,160,0.5); color: var(--teal); }
+  button.btn.run:hover { background: rgba(91,168,160,0.12); }
+  button.btn.ghost { border-color: transparent; color: var(--dim); background: none; }
+  button.btn.ghost:hover { color: var(--ink); background: rgba(255,255,255,0.04); }
+
+  .out { border-top: 1px solid var(--edge); background: #0b0a09; }
+  .outsec { padding: 10px 14px; border-bottom: 1px solid rgba(42,37,33,0.6); }
+  .outsec:last-child { border-bottom: 0; }
+  .outlbl { font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em;
+            text-transform: uppercase; color: var(--dimmer); margin-bottom: 6px; }
+  pre.stream { font-family: var(--mono); font-size: 13px; line-height: 1.6;
+               white-space: pre-wrap; word-break: break-word; color: #ddd4ca; margin: 0; }
+  pre.stream.err { color: var(--warm); }
+  pre.stream.empty { color: var(--dimmer); font-style: italic; }
+
+  table.vars { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; }
+  table.vars td { padding: 3px 8px 3px 0; vertical-align: top; border-bottom: 1px solid rgba(42,37,33,0.5); }
+  table.vars tr:last-child td { border-bottom: 0; }
+  table.vars .vn { color: var(--amber); white-space: nowrap; }
+  table.vars .vt { color: var(--dimmer); white-space: nowrap; }
+  table.vars .vv { color: #ddd4ca; word-break: break-word; }
+
+  pre.struct { font-family: var(--mono); font-size: 12.5px; line-height: 1.65; margin: 0;
+               color: var(--dim); white-space: pre-wrap; }
+  pre.struct .ln { color: var(--dimmer); }
+  pre.struct .gd { color: rgba(91,168,160,0.35); }
+  pre.struct .src { color: #ddd4ca; }
+  pre.struct .bad { color: var(--warm); }
+
+  .verdict { padding: 11px 14px; border-top: 1px solid var(--edge); font-size: 14px; }
+  .verdict.pass { background: rgba(91,168,160,0.09); color: #a9d8d2; }
+  .verdict.fail { background: rgba(232,93,69,0.07); color: #f0b3a6; }
+  .verdict .vh { font-weight: 600; display: block; margin-bottom: 3px; }
+  .verdict pre { font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap;
+                 margin-top: 7px; color: inherit; opacity: 0.86; }
+  .hintbox { padding: 11px 14px; border-top: 1px solid var(--edge);
+             background: rgba(217,160,91,0.06); font-size: 14px; color: #e0c79c; }
+  .hintbox b { color: var(--amber); }
+
+  /* ── status / banner ───────────────────────────────────── */
+  #resume { border: 1px solid var(--edge); border-left: 2px solid var(--amber);
+            background: var(--panel); padding: 13px 16px; border-radius: 0 4px 4px 0;
+            margin-bottom: 30px; font-size: 14px; }
+  #resume .tag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.15em;
+                 text-transform: uppercase; color: var(--amber); display: block; margin-bottom: 5px; }
+  #resume .actions { margin-top: 9px; display: flex; gap: 8px; flex-wrap: wrap; }
+
+  #pystat { position: fixed; right: 14px; bottom: 12px; z-index: 40;
+            font-family: var(--mono); font-size: 11px; color: var(--dimmer);
+            background: var(--panel); border: 1px solid var(--edge);
+            padding: 5px 11px; border-radius: 20px; }
+  #pystat.ready { color: var(--teal); border-color: rgba(91,168,160,0.35); }
+  #pystat.fail  { color: var(--warm); border-color: rgba(232,93,69,0.4); cursor: pointer; }
+
+  /* ── review ────────────────────────────────────────────── */
+  .card { border: 1px solid var(--edge); border-radius: 5px; background: var(--panel);
+          padding: 26px 22px; margin: 22px 0; }
+  .card .q { font-size: 19px; line-height: 1.45; }
+  .card .a { font-size: 15.5px; color: var(--dim); margin-top: 16px;
+             padding-top: 16px; border-top: 1px solid var(--edge); }
+  .card .src { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em;
+               text-transform: uppercase; color: var(--dimmer); margin-bottom: 12px; }
+  .cardbar { display: flex; gap: 9px; margin-top: 20px; flex-wrap: wrap; }
+
+  /* ── ledger / notes ────────────────────────────────────── */
+  .entry { border: 1px solid var(--edge); border-radius: 5px; background: var(--panel);
+           margin: 12px 0; overflow: hidden; }
+  .entryhead { display: flex; gap: 10px; align-items: baseline; padding: 8px 13px;
+               background: var(--panel2); border-bottom: 1px solid var(--edge);
+               font-size: 12.5px; color: var(--dim); cursor: pointer; }
+  .entryhead .when { font-family: var(--mono); font-size: 11px; color: var(--dimmer); }
+  .entryhead .where { flex: 1 1 auto; }
+  .entryhead .flag { font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; }
+  .entryhead .flag.ok { color: var(--teal); }
+  .entryhead .flag.no { color: var(--warm); }
+  .entrybody { padding: 0; }
+  .entrybody pre { font-family: var(--mono); font-size: 12.5px; line-height: 1.6;
+                   padding: 11px 13px; margin: 0; white-space: pre-wrap; color: #ddd4ca; }
+  .entrybody pre.o { border-top: 1px solid var(--edge); background: #0b0a09; color: var(--dim); }
+
+  textarea.notes { width: 100%; min-height: 320px; background: var(--panel);
+                   border: 1px solid var(--edge); border-radius: 5px; color: var(--ink);
+                   font-family: var(--mono); font-size: 13.5px; line-height: 1.65;
+                   padding: 14px; outline: 0; resize: vertical; }
+  textarea.notes:focus { border-color: #3d3630; }
+
+  .stat { display: flex; gap: 26px; flex-wrap: wrap; margin: 18px 0 26px; }
+  .stat div span { display: block; font-family: var(--mono); font-size: 21px; color: var(--ink); }
+  .stat div small { font-size: 11px; letter-spacing: 0.11em; text-transform: uppercase; color: var(--dimmer); }
+
+  hr.sep { border: 0; border-top: 1px solid var(--edge); margin: 34px 0; }
+
+  #railtoggle { display: none; }
+
+  @media (max-width: 860px) {
+    #shell { display: block; }
+    #rail { position: fixed; left: 0; top: 0; z-index: 60; transform: translateX(-100%);
+            transition: transform 0.18s ease; box-shadow: 0 0 40px rgba(0,0,0,0.6); }
+    #rail.open { transform: translateX(0); }
+    #main { padding: 68px 18px 120px; }
+    #railtoggle { display: block; position: fixed; left: 12px; top: 12px; z-index: 61; }
+    h2.lesson-title { font-size: 23px; }
+    #pystat { left: 12px; right: auto; }
+  }
+</style>
+</head>
+<body>
+<button id="railtoggle" class="btn">☰ lessons</button>
+<div id="shell">
+  <nav id="rail">
+    <div id="brand">
+      <h1>The Ledger</h1>
+      <p>Python from the beginning — no pictures required, no past to re-live.</p>
+    </div>
+    <div id="nav"></div>
+  </nav>
+  <main id="main"><div class="wrap" id="view"></div></main>
+</div>
+<div id="pystat">python: starting…</div>
+<script>
+/* ══════════════════════════════════════════════════════════════
+   THE CURRICULUM
+
+   Every lesson carries:
+     why    — one sentence on why the thing exists at all. Not
+              "you'll need it later". A reason you can hold now.
+     known  — the prerequisites, RESTATED IN FULL. Never a
+              back-reference. You should be able to start at
+              lesson 9 cold and not be missing a rule.
+     blocks — prose, rules, warnings, worked code, exercises.
+     cards  — the semantic residue: facts worth reviewing. Not
+              "what did you do on Tuesday" — "what does return do".
+   ══════════════════════════════════════════════════════════════ */
+
+const LESSONS = [
+
+/* ── 1 ─────────────────────────────────────────────────────── */
+{
+  id: "print", title: "Saying things out loud", minutes: 6,
+  why: "A running program is silent. print is the one thing that makes it tell you what it is doing — and you will use it more than anything else in this file.",
+  known: [],
+  blocks: [
+    {t:"p", x:"Python does what you write, in the order you wrote it. Top line first, then the next, then the next, until it runs out of lines. There is nothing clever going on underneath. That is genuinely the whole model."},
+    {t:"rule", x:"`print(X)` writes X into the output, then starts a new line."},
+    {t:"rule", x:"Text has to be wrapped in quotes: `'like this'` or `\"like this\"`. Both work exactly the same. Pick one and stay with it — this file uses double quotes."},
+    {t:"code", src:'print("hello")\nprint("this is a second line")', note:"Two prints, two lines, in the order written. Press Run."},
+    {t:"p", x:"The output panel underneath is the whole point. You never have to hold the result in your head — it is written down, on screen, until you change it."},
+    {t:"warn", x:"Leave the quotes off and Python assumes you meant the *name* of something (lesson 2) rather than the text itself, and stops with `NameError`. It is the single most common first error. It means nothing about you."},
+    {t:"code", src:'print(hello)', note:"This one is meant to fail. Run it and read the error — the last line is the part that talks."},
+    {t:"rule", x:"`print()` with nothing inside prints an empty line. Useful for spacing things out."},
+    {t:"ex", id:"p1",
+      prompt:"Make it print your name — or any word. One line, one print.",
+      starter:'print("")',
+      check:{ require:[["print\\s*\\(", "use print(...)"]], nonempty:true },
+      hints:["Put the word inside the quotes that are already there.",
+             "It should look like: print(\"Vee\") — with your word between the quotes."],
+      solution:'print("Vee")'},
+    {t:"ex", id:"p2",
+      prompt:"Print exactly these three lines, in this order:\n\napple\npear\nquince",
+      starter:"",
+      check:{ out:"apple\npear\nquince" },
+      hints:["Three separate print lines, one under the other.",
+             "Each word needs its own quotes. print(\"apple\") is line one."],
+      solution:'print("apple")\nprint("pear")\nprint("quince")'}
+  ],
+  cards: [
+    {q:"What does print(X) do?", a:"Writes X into the output, then starts a new line."},
+    {q:"How do you write a piece of text in Python?", a:"Wrap it in quotes — \"like this\" or 'like this'. Without quotes, Python reads it as a name instead and raises NameError."}
+  ]
+},
+
+/* ── 2 ─────────────────────────────────────────────────────── */
+{
+  id: "names", title: "Names", minutes: 9,
+  why: "You need a way to say \"the thing I made a moment ago\" without writing it out again. That is all a variable is.",
+  known: [
+    "`print(X)` writes X into the output and starts a new line.",
+    "Text goes in quotes: `\"hello\"`. Without quotes Python reads it as a name."
+  ],
+  blocks: [
+    {t:"rule", x:"`name = value` attaches the name on the left to the value on the right."},
+    {t:"warn", x:"`=` does **not** mean \"equals\". It means \"attach\". It always runs right-to-left: Python works out the right-hand side first, then attaches the name to the result. Reading `x = y` as a statement of fact will mislead you every time; read it as an instruction — *attach x to y*."},
+    {t:"code", src:'greeting = "hello"\nwho = "world"\nprint(greeting)\nprint(who)', note:"Two names, two attachments, then two prints. Run it and look at the NAMES table underneath the output."},
+    {t:"note", x:"You do not have to picture any of this. Underneath every run, this page prints the actual table of every name currently in existence, what it is attached to, and what kind of thing that is. Read the table. It is not a hint or a simplification — it is the real state, read straight out of Python."},
+    {t:"p", x:"A name is a label, not a container. Nothing is stored *inside* `greeting`. If you attach the same name to something else later, the label simply moves — the old value is not modified, it is just no longer labelled."},
+    {t:"code", src:'x = "first"\nprint(x)\nx = "second"\nprint(x)', note:"One name, attached twice. The table at the end shows only the final attachment — that is the honest picture: only now exists."},
+    {t:"rule", x:"`+` between two pieces of text joins them together, adding nothing in between. If you want a space, you supply it yourself."},
+    {t:"code", src:'first = "Ada"\nlast = "Lovelace"\nfull = first + " " + last\nprint(full)', note:'Notice the " " — a piece of text containing one space. Take it out and re-run to see what happens.'},
+    {t:"rule", x:"Name rules: letters, digits and underscores; may not start with a digit; case matters. `name` and `Name` are two different names. Convention is lowercase with underscores: `first_name`."},
+    {t:"warn", x:"`=` attaches. `==` asks a question (lesson 5). They look similar and mean completely unrelated things. This trips up everyone; it is not a sign you are missing something."},
+    {t:"ex", id:"n1",
+      prompt:"Attach `animal` to the text \"otter\", attach `sound` to the text \"chirp\", then print exactly:\n\nThe otter says chirp.",
+      starter:'animal = \nsound = \n',
+      check:{ out:"The otter says chirp.", require:[["animal\\s*=","attach a name called animal"],["sound\\s*=","attach a name called sound"]] },
+      hints:["Build the sentence with + : \"The \" + animal + \" says \" + sound + \".\"",
+             "Watch the spaces. \"The \" has a space before the closing quote, and \" says \" has one at each end.",
+             "print(\"The \" + animal + \" says \" + sound + \".\")"],
+      solution:'animal = "otter"\nsound = "chirp"\nprint("The " + animal + " says " + sound + ".")'},
+    {t:"ex", id:"n2",
+      prompt:"Attach `word` to \"stone\". Print it. Then attach the same name `word` to \"water\" and print it again. Two lines of output: stone, then water.",
+      starter:"",
+      check:{ out:"stone\nwater", require:[["word","use a name called word"]] },
+      hints:["Four lines: attach, print, attach again, print again.",
+             "word = \"stone\" / print(word) / word = \"water\" / print(word)"],
+      solution:'word = "stone"\nprint(word)\nword = "water"\nprint(word)'}
+  ],
+  cards: [
+    {q:"What does the = sign actually mean in Python?", a:"Attach. The name on the left becomes a label for the value on the right. Python evaluates the right-hand side first, then attaches. It is an instruction, not a statement of fact."},
+    {q:"What does + do between two pieces of text?", a:"Joins them, adding nothing in between. Spaces have to be supplied yourself: first + \" \" + last."},
+    {q:"Are `name` and `Name` the same name in Python?", a:"No. Names are case-sensitive — those are two entirely separate names."}
+  ]
+},
+
+/* ── 3 ─────────────────────────────────────────────────────── */
+{
+  id: "kinds", title: "Kinds of thing", minutes: 9,
+  why: "Python treats text and numbers as different kinds of thing, and the same symbol means different things depending on which you have. Most baffling early errors are really a kind mismatch.",
+  known: [
+    "`print(X)` writes X and starts a new line.",
+    "`name = value` attaches the name on the left to the value on the right.",
+    "`+` between two pieces of text joins them."
+  ],
+  blocks: [
+    {t:"note", x:"Nothing in this file requires you to do arithmetic. Numbers show up only where Python itself needs them, they stay small, and the page always shows you the result. This is not a maths test and never becomes one."},
+    {t:"p", x:"Every value in Python is of some kind — Python calls it a *type*. There are four you need now."},
+    {t:"table", head:["written","type","what it is"], rows:[
+      ['"12"',   "str",   "text. The quotes are what make it text."],
+      ["12",     "int",   "a whole number."],
+      ["12.5",   "float", "a number with a decimal point."],
+      ["True",   "bool",  "one of exactly two values: True or False. Capital letter, no quotes."]
+    ]},
+    {t:"rule", x:"`type(X)` hands back the kind of X. Print it when you are not sure — you are allowed to just look."},
+    {t:"code", src:'print(type("12"))\nprint(type(12))\nprint(type(12.5))\nprint(type(True))', note:"Four kinds, named out loud."},
+    {t:"rule", x:"`+` between two `str` values joins them. `+` between two `int` values adds them. Same symbol, two different operations, decided by the kinds on either side."},
+    {t:"code", src:'print("12" + "3")\nprint(12 + 3)', note:'The first is a join and gives "123". The second is an addition and gives 15. The quotes are the entire difference.'},
+    {t:"warn", x:"`\"12\" + 3` is an error — `TypeError`. Python refuses to guess whether you wanted \"123\" or 15. That refusal is deliberate and it is on your side: a language that guessed would give you a wrong answer silently instead of an error you can read."},
+    {t:"rule", x:"`str(X)` makes a text version of X. `int(X)` makes a whole number out of text that looks like one. These are how you deliberately cross between kinds."},
+    {t:"code", src:'count = 3\nprint("I have " + str(count) + " of them")', note:"count is an int; str(count) is the text \"3\"; now everything being joined is text, so + is a join."},
+    {t:"ex", id:"k1",
+      prompt:"This line is broken. Run it first and read the error, then fix it so it prints exactly:\n\nthere are 4 chairs",
+      starter:'chairs = 4\nprint("there are " + chairs + " chairs")',
+      check:{ out:"there are 4 chairs" },
+      hints:["chairs is an int. The things either side of it are text. Python will not mix them.",
+             "Wrap chairs in str( ) so that everything in the line is text.",
+             'print("there are " + str(chairs) + " chairs")'],
+      solution:'chairs = 4\nprint("there are " + str(chairs) + " chairs")'},
+    {t:"ex", id:"k2",
+      prompt:"Attach `a` to the text \"5\" and `b` to the number 5. Print the type of each — two lines of output.",
+      starter:"",
+      check:{ out:"<class 'str'>\n<class 'int'>" },
+      hints:['"5" with quotes is text. 5 without quotes is a number.',
+             'a = "5" / b = 5 / print(type(a)) / print(type(b))'],
+      solution:'a = "5"\nb = 5\nprint(type(a))\nprint(type(b))'}
+  ],
+  cards: [
+    {q:"What is the difference between \"12\" and 12?", a:"\"12\" is a str — text. 12 is an int — a number. The quotes are the only difference and they change what + does."},
+    {q:"Why does \"12\" + 3 raise a TypeError?", a:"Python will not guess whether you meant to join (giving \"123\") or to add (giving 15), so it refuses and tells you. Fix it by making both sides the same kind: str(3) or int(\"12\")."},
+    {q:"How do you find out what kind of thing a value is?", a:"type(X) — and print it. Looking is allowed."}
+  ]
+},
+
+/* ── 4 ─────────────────────────────────────────────────────── */
+{
+  id: "fstrings", title: "Filling in the blanks", minutes: 9,
+  why: "Joining text with + works, but it makes you convert every number by hand and count your own spaces. An f-string lets you write the sentence you actually want and drop the values into it.",
+  known: [
+    "`print(X)` writes X and starts a new line.",
+    "`name = value` attaches the name on the left to the value on the right.",
+    "Text is `str`, whole numbers are `int`. `+` joins two strs but adds two ints, and mixing them is a `TypeError`.",
+    "`str(X)` makes a text version of X; `len(X)` gives the length of a piece of text."
+  ],
+  blocks: [
+    {t:"rule", x:"Put an `f` immediately before the opening quote, and then anything you write inside `{ }` is worked out and dropped into the text. `f\"Hello, {name}\"`."},
+    {t:"rule", x:"**You do not need `str()` inside an f-string.** Whatever is in the braces gets converted to text for you. That is the main reason to reach for one."},
+    {t:"code", src:'name = "Vee"\ncount = 3\n\nprint("Hello, " + name + " - you have " + str(count) + " of them")\nprint(f"Hello, {name} - you have {count} of them")',
+      note:"Identical output. One of them you can read at a glance, and one of them you had to assemble."},
+    {t:"p", x:"The braces are the whole idea: you write the sentence in one piece, in the order a person reads it, and mark the holes. No counting the spaces at the ends of fragments, no wrapping numbers in `str()`, no chain of `+` to lose your place in."},
+    {t:"warn", x:"The `f` has to be there. Without it, `\"Hello, {name}\"` prints the braces exactly as written — you will see `{name}` sitting in your output. It is the commonest f-string mistake and it announces itself immediately, which makes it one of the harmless ones."},
+    {t:"code", src:'name = "Vee"\nprint("Hello, {name}")\nprint(f"Hello, {name}")', note:"The forgotten f, then the same line with it. Run it and compare the two lines of output."},
+    {t:"rule", x:"Anything that produces a value can go inside the braces — a name, an item out of a list, a call to a function, a whole expression: `f\"{len(birds)} birds\"`, `f\"the first is {birds[0]}\"`."},
+    {t:"code", src:'birds = ["heron", "wren", "crow"]\nprint(f"There are {len(birds)} birds, and the first is {birds[0]}.")',
+      note:"Two holes, both filled by working something out rather than by a plain name."},
+    {t:"note", x:"Keep what is inside the braces short. If it is turning into real work, do the work on a line above and attach a name to the result, then drop the name in. The braces are for placing a value, not for thinking in."},
+    {t:"rule", x:"`f\"{value!r}\"` drops in the **repr** rather than the plain text — which for a str means you get the quotes too. Use it when you need to see whether something has a stray space on the end, or whether that 7 is text or a number."},
+    {t:"code", src:'answer = "7 "\nprint(f"you said {answer} and that is that")\nprint(f"you said {answer!r} and that is that")',
+      note:"The same value twice. Only the second one shows you the trailing space that is about to cause a problem."},
+    {t:"note", x:"One shorthand worth having on the first day: `f\"{name=}\"` prints the name **and** its value — `name='Vee'`. It is the fastest possible version of print-it-and-look, and it is impossible to mislabel because Python writes the label for you."},
+    {t:"code", src:'word = "heron"\ncount = 3\nprint(f"{word=} {count=}")', note:"Two names, labelled and shown, with nothing typed twice."},
+    {t:"note", x:"From here on every exercise checks **the output**, never how you built it — `+` and f-strings are both accepted everywhere, always. A few later examples deliberately keep using `+` where the point being made is about types meeting. The rest use f-strings, because that is overwhelmingly what you will meet in real code."},
+    {t:"ex", id:"fs1",
+      prompt:"Attach `animal` to \"otter\" and `sound` to \"chirp\", then use an f-string to print exactly:\n\nThe otter says chirp.",
+      starter:'animal = "otter"\nsound = "chirp"\n',
+      check:{ out:"The otter says chirp.", require:[["f[\"']", "use an f-string - an f immediately before the opening quote"]],
+              forbid:[["\\+", "build it with an f-string this time rather than with +"]] },
+      hints:["Write the sentence in one piece and put braces where the values go.",
+             'print(f"The {animal} says {sound}.")'],
+      solution:'animal = "otter"\nsound = "chirp"\nprint(f"The {animal} says {sound}.")'},
+    {t:"ex", id:"fs2",
+      prompt:"Using the list below, print exactly:\n\nThere are 3 tools, and the last one is awl.\n\nDo not type the number 3 yourself - work it out from the list.",
+      starter:'tools = ["chisel", "rasp", "awl"]\n',
+      check:{ out:"There are 3 tools, and the last one is awl.",
+              require:[["f[\"']", "use an f-string"], ["len\\s*\\(", "use len() rather than typing the number"],
+                       ["\\[-1\\]", "use [-1] for the last one"]] },
+      hints:["len(tools) goes in the first pair of braces.",
+             "tools[-1] is the last one, and it can go straight inside braces too.",
+             'print(f"There are {len(tools)} tools, and the last one is {tools[-1]}.")'],
+      solution:'tools = ["chisel", "rasp", "awl"]\nprint(f"There are {len(tools)} tools, and the last one is {tools[-1]}.")'}
+  ],
+  cards: [
+    {q:"What does the f before the opening quote do?", a:"It makes the text an f-string: anything inside { } is worked out and dropped in. Without the f you get the braces printed literally."},
+    {q:"Why do you not need str() inside an f-string?", a:"An f-string converts whatever is in the braces to text by itself. That is the main reason to use one over a chain of +."},
+    {q:"What does f\"{name=}\" print?", a:"Both the name and its value - name='Vee'. The fastest form of print-it-and-look, and it cannot be mislabelled because Python writes the label."},
+    {q:"When would you write f\"{value!r}\" instead of f\"{value}\"?", a:"When you need the repr rather than the plain text - to see quotes, or a stray trailing space, or whether a 7 is a str or an int."}
+  ]
+},
+
+/* ── 5 ─────────────────────────────────────────────────────── */
+{
+  id: "input", title: "Asking", minutes: 6,
+  why: "A program that only ever does one thing is a document. Taking input is the smallest step to a program that does something different depending on the day.",
+  known: [
+    "`print(X)` writes X and starts a new line.",
+    "`name = value` attaches the name to the value.",
+    "Text is `str`, whole numbers are `int`, and `+` joins two strs but adds two ints.",
+    "`str(X)` converts to text; `int(X)` converts text to a whole number.",
+    "`f\"text {name} and {count}\"` drops those values into the text, converting them for you - an f-string. No `str()` needed."
+  ],
+  blocks: [
+    {t:"rule", x:"`input(\"prompt\")` writes the prompt, waits for a line to be typed, and hands back what was typed."},
+    {t:"warn", x:"`input` **always** hands back a `str`, no exceptions. If the person types 7, you get the text `\"7\"`, not the number 7. Forgetting this causes more confused beginner TypeErrors than anything else in the language."},
+    {t:"note", x:"On this page nobody is here to type. Below the editor there is an **input lines** box — put there, one per line, what the imaginary person types. The first `input()` takes the first line, the second takes the second, and so on."},
+    {t:"note", x:"The prompt and the typed line both appear in the output panel, on the same line, exactly as a real terminal would show them. So `What is your name? Vee` in the output is two things: your prompt, and what the imaginary person typed after it. Nothing has gone wrong."},
+    {t:"code", src:'name = input("What is your name? ")\nprint("Hello, " + name)', inputs:"Vee", note:"The input box below already contains one line. Run it, then change what is in the box and run it again."},
+    {t:"code", src:'a = input("say something: ")\nprint(type(a))', inputs:"7", note:"Typed 7, got the text \"7\". Look at the type."},
+    {t:"ex", id:"i1",
+      prompt:"Ask for a colour, then print a line reading `I also like green.` — full stop included. The input box below supplies \"green\"; your code should work for whatever word is in that box, not just this one.\n\nYour own prompt wording is up to you, and it will appear in the output above the sentence. That is expected — only the sentence is checked.",
+      starter:'',
+      check:{ contains:["I also like green."], inputs:"green", require:[["input\\s*\\(","use input(...)"]] },
+      hints:["Attach a name to the result of input, then build the sentence with +.",
+             'colour = input("colour? ") then print("I also like " + colour + ".")'],
+      solution:'colour = input("What colour? ")\nprint("I also like " + colour + ".")'}
+  ],
+  cards: [
+    {q:"What kind of thing does input() always hand back?", a:"A str — text — every single time, even when the person typed digits. Convert with int() if you need a number."}
+  ]
+},
+
+/* ── 6 ─────────────────────────────────────────────────────── */
+{
+  id: "choose", title: "Choosing", minutes: 11,
+  why: "Everything interesting a program does comes from doing one thing in some situations and a different thing in others.",
+  known: [
+    "`print(X)` writes X and starts a new line.",
+    "`name = value` attaches the name to the value.",
+    "`input(\"prompt\")` waits for a typed line and hands it back as text.",
+    "`f\"text {name} and {count}\"` drops those values into the text, converting them for you - an f-string. No `str()` needed."
+  ],
+  blocks: [
+    {t:"rule", x:"`==` asks *are these two the same?* and hands back `True` or `False`. It is a question. `=` attaches. They are unrelated."},
+    {t:"table", head:["written","asks"], rows:[
+      ["a == b", "are they the same?"],
+      ["a != b", "are they different?"],
+      ["a < b",  "is a smaller? For text, this means earlier in alphabetical order."],
+      ["a > b",  "is a larger? For text, later in alphabetical order."],
+      ["a in b", "does a appear inside b? Works for text-inside-text and for lists."]
+    ]},
+    {t:"code", src:'print("cat" == "cat")\nprint("cat" == "dog")\nprint("at" in "cat")', note:"Questions, asked out loud. Each one produces True or False and nothing else."},
+    {t:"rule", x:"`if CONDITION:` runs the indented lines underneath it, but only when the condition is True. The colon at the end is required. The indentation is required."},
+    {t:"warn", x:"Indentation is not decoration in Python — it is the only thing that says which lines belong to the `if`. Four spaces per level. **The Tab key in these editors inserts exactly four spaces**, and pressing Enter after a line ending in `:` indents the next line for you."},
+    {t:"note", x:"Under every run there is a **structure** panel that redraws your code with the block nesting marked out, and flags any line whose indentation does not line up. If you are ever unsure which lines are inside which block, open it and read — do not try to hold the shape in your head."},
+    {t:"code", src:'weather = "rain"\nif weather == "rain":\n    print("take the coat")\nprint("leave the house")',
+      note:"Only the first print is indented, so only it is inside the if. The second happens regardless. Change \"rain\" to \"sun\" and run again — one line of output instead of two."},
+    {t:"rule", x:"`else:` runs when the `if` did not. `elif CONDITION:` means *otherwise, if* — you may have as many as you like."},
+    {t:"rule", x:"In an `if` / `elif` / `else` chain **exactly one** branch runs. Python checks the conditions top to bottom, takes the first True one, and skips every other branch entirely — including ones that would also have been True."},
+    {t:"code", src:'animal = "crow"\nif animal == "otter":\n    print("river")\nelif animal == "crow":\n    print("air")\nelse:\n    print("somewhere else")',
+      note:"Three branches written, one branch run."},
+    {t:"warn", x:"`if x = \"rain\":` is a syntax error — that is the attach symbol, and Python will not let you attach inside a question. You want `==`."},
+    {t:"ex", id:"c1",
+      prompt:"Attach `door` to \"locked\". If it is \"locked\", print `wait outside`; otherwise print `go in`. Then, on the line after the whole if, always print `done`.",
+      starter:'door = "locked"\n',
+      check:{ out:"wait outside\ndone", require:[["if\\b","use an if"],["else\\s*:","use an else"]] },
+      hints:["The last print must NOT be indented — that is what makes it happen either way.",
+             'if door == "locked": / (indented) print("wait outside") / else: / (indented) print("go in") / then print("done") at no indent'],
+      solution:'door = "locked"\nif door == "locked":\n    print("wait outside")\nelse:\n    print("go in")\nprint("done")'},
+    {t:"ex", id:"c2",
+      prompt:"Attach `creature` to \"heron\". Write a chain that prints `river` for \"otter\", `air` for \"heron\", `hedge` for \"wren\", and `unlisted` for anything else. It should print exactly:\n\nair",
+      starter:'creature = "heron"\n',
+      check:{ out:"air", require:[["elif\\b","use at least one elif"],["else\\s*:","use an else"]] },
+      hints:["if for the first, elif for the middle two, else for the fallback.",
+             "Each branch is one indented print. Only one of the four will run."],
+      solution:'creature = "heron"\nif creature == "otter":\n    print("river")\nelif creature == "heron":\n    print("air")\nelif creature == "wren":\n    print("hedge")\nelse:\n    print("unlisted")'}
+  ],
+  cards: [
+    {q:"What is the difference between = and == ?", a:"= attaches a name to a value (an instruction). == asks whether two values are the same and produces True or False (a question). Unrelated operations."},
+    {q:"In an if / elif / else chain, how many branches run?", a:"Exactly one. Python takes the first condition that is True, runs that branch, and skips all the others — even ones that would also have been True."},
+    {q:"What decides which lines are inside an if?", a:"The indentation, and only the indentation. Four spaces per level. Python has no braces or end keyword; the whitespace is the syntax."}
+  ]
+},
+
+/* ── 7 ─────────────────────────────────────────────────────── */
+{
+  id: "lists", title: "Lists", minutes: 10,
+  why: "You almost never have one of something. A list holds many things in a definite order and lets you keep adding.",
+  known: [
+    "`name = value` attaches the name on the left to the value on the right.",
+    "`print(X)` writes X and starts a new line.",
+    "`\"text\"` is a `str`; `+` joins two strs, and `f\"text {name}\"` drops a value straight into the text.",
+    "`if CONDITION:` runs its indented block when the condition is True."
+  ],
+  blocks: [
+    {t:"rule", x:"`[a, b, c]` is a list — several values, in a definite order, kept in that order until you change it. The values can be anything, including other lists."},
+    {t:"code", src:'birds = ["heron", "wren", "crow"]\nprint(birds)\nprint(len(birds))', note:"Run it and read the NAMES table: one name, attached to one list, of type list."},
+    {t:"rule", x:"`things[0]` is the **first** item. Counting starts at zero."},
+    {t:"p", x:"The honest reason, since \"just because\" is not an explanation: the number in the brackets is not a position, it is a **distance from the start**. The first item is zero away from the start; the second is one away. You do not have to like it. You do have to know it, because every list in every language you meet will do it."},
+    {t:"rule", x:"`things[-1]` is the last item, `things[-2]` the one before it. Negative means *counting back from the end*. Use `[-1]` for \"the last one\" — it never requires you to work out how many there are."},
+    {t:"note", x:"Almost nothing in real Python needs you to calculate an index. `[0]`, `[-1]`, and looping over the whole thing (next lesson) cover the overwhelming majority of cases. If you find yourself doing arithmetic to reach an item, there is nearly always a way to loop instead."},
+    {t:"code", src:'birds = ["heron", "wren", "crow"]\nprint(birds[0])\nprint(birds[-1])', note:"First and last, without counting anything."},
+    {t:"table", head:["written","what it does"], rows:[
+      ["len(things)",         "how many items there are, as an int."],
+      ["things.append(x)",    "adds x to the end. Changes the list in place — it hands nothing back."],
+      ["things[i] = x",       "replaces the item at position i."],
+      ["things.remove(x)",    "removes the first item equal to x."],
+      ["x in things",         "True if x is one of the items."],
+      ["things + other",      "a new list with both, joined. The originals are untouched."],
+      ["sorted(things)",      "a new list, in order. The original is untouched."],
+      ["things.sort()",       "reorders the list in place, and hands nothing back."]
+    ]},
+    {t:"warn", x:"`birds = birds.append(\"owl\")` is a classic trap. `.append` changes the list and hands back nothing — so you have just attached `birds` to nothing (`None`) and lost your list. Write `birds.append(\"owl\")` on its own line, with no `=`."},
+    {t:"code", src:'birds = ["heron", "wren"]\nbirds.append("crow")\nprint(birds)\nprint(sorted(birds))\nprint(birds)',
+      note:"sorted() hands back a new ordered list; the original is still in its original order on the third print. Read the NAMES table underneath."},
+    {t:"ex", id:"l1",
+      prompt:"Attach `tools` to a list containing \"chisel\" and \"rasp\". Append \"awl\". Then print the first item and the last item, each on its own line.",
+      starter:"",
+      check:{ out:"chisel\nawl", require:[["append","use .append"],["\\[-1\\]","use [-1] for the last item"]] },
+      hints:["The append goes on its own line with no = in front of it.",
+             'tools = ["chisel", "rasp"] / tools.append("awl") / print(tools[0]) / print(tools[-1])'],
+      solution:'tools = ["chisel", "rasp"]\ntools.append("awl")\nprint(tools[0])\nprint(tools[-1])'},
+    {t:"ex", id:"l2",
+      prompt:"Attach `words` to the list [\"willow\", \"alder\", \"birch\"]. Print how many there are, then print the list in alphabetical order, leaving the original alone.",
+      starter:"",
+      check:{ out:"3\n['alder', 'birch', 'willow']" },
+      hints:["len() for the count, sorted() for the ordering.",
+             "print(len(words)) then print(sorted(words))"],
+      solution:'words = ["willow", "alder", "birch"]\nprint(len(words))\nprint(sorted(words))'}
+  ],
+  cards: [
+    {q:"Why does list indexing start at 0?", a:"The number is a distance from the start, not a position. The first item is 0 away from the start. Every mainstream language does this."},
+    {q:"How do you get the last item of a list without knowing its length?", a:"things[-1]. Negative indexes count back from the end."},
+    {q:"What is wrong with: birds = birds.append(\"owl\") ?", a:".append changes the list in place and hands back None — so the name gets attached to None and the list is lost. Write birds.append(\"owl\") on its own line, with no =."},
+    {q:"What is the difference between sorted(things) and things.sort() ?", a:"sorted() hands back a new ordered list and leaves the original alone. .sort() reorders the original in place and hands back nothing."}
+  ]
+},
+
+/* ── 8 ─────────────────────────────────────────────────────── */
+{
+  id: "repeat", title: "Repeating", minutes: 11,
+  why: "Doing the same thing to every item in a collection is most of what programs actually do. Writing it out once and saying \"for each\" is the whole trick.",
+  known: [
+    "`[a, b, c]` is a list, in a definite order. `things[0]` is the first, `things[-1]` the last, `len(things)` the count, `things.append(x)` adds to the end.",
+    "`if CONDITION:` runs its indented block when the condition is True; `else:` runs when it did not.",
+    "Indentation, four spaces per level, is what says which lines are inside a block.",
+    "`+` joins two strs; `str(X)` makes a text version of X; `f\"text {name}\"` drops a value into the text with no `str()` needed."
+  ],
+  blocks: [
+    {t:"rule", x:"`for item in things:` runs the indented block once for every item in `things`, in order, with the name `item` attached to that item on each pass. `item` is a name you choose — call it whatever the things actually are."},
+    {t:"code", src:'birds = ["heron", "wren", "crow"]\nfor bird in birds:\n    print(f"saw a {bird}")',
+      note:"Three items, so the indented line runs three times. Nothing was counted and no index was written."},
+    {t:"p", x:"After the loop finishes, the name you chose is still attached to the last item it handled. That is occasionally useful and occasionally a surprise — the NAMES table will show it to you."},
+    {t:"rule", x:"Lines after the loop, at no indentation, run once, after the whole loop has finished."},
+    {t:"code", src:'trees = ["alder", "birch"]\nfor tree in trees:\n    print(tree)\nprint("that is all of them")',
+      note:"Two indented runs, then one unindented line, once. Open the structure panel underneath if the shape is not obvious from the text."},
+    {t:"p", x:"The commonest useful shape in all of Python: start an empty list, loop over something, and append to the new list as you go."},
+    {t:"code", src:'words = ["willow", "alder", "birch", "blackthorn"]\nlong_ones = []\nfor word in words:\n    if len(word) > 5:\n        long_ones.append(word)\nprint(long_ones)',
+      note:"An if inside a for — two levels of indentation, eight spaces on the append. The structure panel draws this out if you want to check it."},
+    {t:"rule", x:"You can loop over the characters of a piece of text too: `for letter in \"crow\":` gives you `c`, `r`, `o`, `w`. Text behaves like a sequence of one-character pieces of text."},
+    {t:"rule", x:"`break` leaves the loop immediately. `continue` skips the rest of this pass and starts the next one."},
+    {t:"code", src:'for bird in ["heron", "wren", "crow", "kite"]:\n    if bird == "crow":\n        break\n    print(bird)',
+      note:"Stops the moment it reaches crow — crow is never printed, and kite is never reached."},
+    {t:"rule", x:"`range(n)` produces the whole numbers from 0 up to but not including n. Use it only when you want to repeat something a set number of times and do not care about the values: `for _ in range(3):`. The underscore is a conventional name meaning *I am not going to use this*."},
+    {t:"note", x:"You will see `for i in range(len(things)):` in a great deal of tutorial code. It is almost always the worse way to write `for thing in things:` — it makes you carry an index you did not need. Prefer looping over the things themselves."},
+    {t:"warn", x:"Two errors to expect, both harmless and both frequent: forgetting the `:` at the end of the `for` line (`SyntaxError`), and forgetting to indent the body (`IndentationError`). The error message names the line."},
+    {t:"ex", id:"r1",
+      prompt:"Loop over the list [\"chisel\", \"rasp\", \"awl\"] and print each one with \"a \" in front of it, so the output is:\n\na chisel\na rasp\na awl",
+      starter:'tools = ["chisel", "rasp", "awl"]\n',
+      check:{ out:"a chisel\na rasp\na awl", require:[["for\\b","use a for loop"]] },
+      hints:["One for line ending in a colon, one indented print.",
+             'for tool in tools: then (indented) print(f"a {tool}") - or print("a " + tool), either is accepted'],
+      solution:'tools = ["chisel", "rasp", "awl"]\nfor tool in tools:\n    print("a " + tool)'},
+    {t:"ex", id:"r2",
+      prompt:"Start from [\"heron\", \"wren\", \"crow\", \"kite\"]. Build a new list holding only the names with exactly four letters, and print that new list. Expected output:\n\n['wren', 'crow', 'kite']",
+      starter:'birds = ["heron", "wren", "crow", "kite"]\nshort = []\n',
+      check:{ out:"['wren', 'crow', 'kite']", require:[["for\\b","use a for loop"],["append","use .append"]] },
+      hints:["Loop, then an if inside the loop, then an append inside the if.",
+             "len(bird) == 4 is the question to ask.",
+             "The append line sits at two levels of indentation — eight spaces."],
+      solution:'birds = ["heron", "wren", "crow", "kite"]\nshort = []\nfor bird in birds:\n    if len(bird) == 4:\n        short.append(bird)\nprint(short)'}
+  ],
+  cards: [
+    {q:"What does `for item in things:` do?", a:"Runs its indented block once per item in things, in order, with the name item attached to the current item each time."},
+    {q:"What is the difference between break and continue?", a:"break leaves the loop entirely. continue abandons the rest of this pass and moves to the next item."},
+    {q:"Why prefer `for thing in things:` over `for i in range(len(things)):` ?", a:"Because the second makes you carry an index you did not need, and indexes are where off-by-one mistakes live. Loop over the things themselves whenever you can."}
+  ]
+},
+
+/* ── 9 ─────────────────────────────────────────────────────── */
+{
+  id: "dicts", title: "Look-up tables", minutes: 10,
+  why: "A list answers \"what is the third one\". A dictionary answers \"what goes with this\" — the capital of France, the meaning of a word, the settings for a user. That is the question you usually actually have.",
+  known: [
+    "`[a, b, c]` is a list; `things[0]` is the first item; `len(things)` is the count.",
+    "`for item in things:` runs its indented block once per item.",
+    "`if CONDITION:` / `else:` choose between branches; indentation says what is inside.",
+    "`+` joins two strs; `f\"text {name} and {other}\"` drops both values into the text."
+  ],
+  blocks: [
+    {t:"rule", x:"`{key: value, key: value}` is a dictionary — a set of pairs. You look things up by the key, never by position."},
+    {t:"code", src:'homes = {"otter": "river", "heron": "reeds", "wren": "hedge"}\nprint(homes["heron"])',
+      note:"No counting, no order to keep track of. You asked for heron and got reeds."},
+    {t:"table", head:["written","what it does"], rows:[
+      ["d[key]",            "the value for that key. Raises KeyError if the key is not there."],
+      ["d[key] = value",    "sets it — adding the key if it was not already there."],
+      ["key in d",          "True if that key exists. Ask this before d[key] if you are unsure."],
+      ["d.get(key)",        "the value, or None if the key is missing — no error."],
+      ["d.get(key, other)", "the value, or `other` if the key is missing. The safe everyday form."],
+      ["len(d)",            "how many pairs."],
+      ["del d[key]",        "removes that pair."],
+      ["d.keys()",          "all the keys."],
+      ["d.values()",        "all the values."],
+      ["d.items()",         "all the pairs, each as (key, value)."]
+    ]},
+    {t:"rule", x:"`for key in d:` loops over the **keys**. `for key, value in d.items():` loops over both at once — two names on the left, because each pair hands back two things."},
+    {t:"code", src:'homes = {"otter": "river", "heron": "reeds"}\nfor animal, place in homes.items():\n    print(f"{animal} lives in the {place}")',
+      note:"Two names, filled from each pair in turn. Dictionaries keep the order you inserted things in."},
+    {t:"warn", x:"Asking for a key that is not there raises `KeyError` and stops the program. `d.get(key, \"default\")` is the version that does not — reach for it whenever the key might be absent."},
+    {t:"code", src:'homes = {"otter": "river"}\nprint(homes.get("badger", "unknown"))\nprint(homes["badger"])',
+      note:"The safe form, then the one that stops. The second is meant to fail — read the last line of the error."},
+    {t:"rule", x:"Keys must be things that cannot change — text and numbers are fine, lists are not. Values can be anything at all, including lists and other dictionaries."},
+    {t:"ex", id:"d1",
+      prompt:"Build a dictionary attached to `sounds` with \"otter\" giving \"chirp\" and \"crow\" giving \"caw\". Add \"heron\" giving \"frank\" afterwards, on its own line. Then print the sound a heron makes — just the word.",
+      starter:"",
+      check:{ out:"frank", require:[["sounds\\s*\\[\\s*[\"']heron","add heron with sounds[...] = ..."]] },
+      hints:["Adding a key is the same as setting one: sounds[\"heron\"] = \"frank\".",
+             'sounds = {"otter": "chirp", "crow": "caw"} / sounds["heron"] = "frank" / print(sounds["heron"])'],
+      solution:'sounds = {"otter": "chirp", "crow": "caw"}\nsounds["heron"] = "frank"\nprint(sounds["heron"])'},
+    {t:"ex", id:"d2",
+      prompt:"Loop over {\"willow\": \"river\", \"gorse\": \"heath\"} and print one line per pair, like:\n\nwillow grows on the river\ngorse grows on the heath",
+      starter:'where = {"willow": "river", "gorse": "heath"}\n',
+      check:{ out:"willow grows on the river\ngorse grows on the heath", require:[["items\\s*\\(","use .items()"]] },
+      hints:["for plant, place in where.items(): — two names, because each pair is two things.",
+             'The body is print(f"{plant} grows on the {place}")'],
+      solution:'where = {"willow": "river", "gorse": "heath"}\nfor plant, place in where.items():\n    print(plant + " grows on the " + place)'}
+  ],
+  cards: [
+    {q:"When do you reach for a dictionary rather than a list?", a:"When you want to look something up by a meaningful key rather than by position — a name, a word, an id."},
+    {q:"What does d.get(key, other) do that d[key] does not?", a:"It hands back `other` instead of raising KeyError when the key is missing. Use it whenever the key might be absent."},
+    {q:"How do you loop over both keys and values of a dictionary?", a:"for key, value in d.items(): — two names on the left, because each item is a pair."}
+  ]
+},
+
+/* ── 10 ────────────────────────────────────────────────────── */
+{
+  id: "comps", title: "The short way to make a list", minutes: 12,
+  why: "Building a new list out of an old one is so common that Python has a one-line form of it. You will read these constantly in other people's code, so you need to be able to decode one whether or not you ever choose to write one.",
+  known: [
+    "`[a, b, c]` is a list. `things.append(x)` adds to the end, `len(things)` counts, `things[0]` is the first and `things[-1]` the last.",
+    "`{key: value}` is a dictionary; `d[key]` looks one up and `for k, v in d.items():` loops over the pairs.",
+    "`for item in things:` runs its indented block once per item, in order.",
+    "`if CONDITION:` runs its indented block when the condition is True; `else:` runs when it did not.",
+    "`f\"text {name}\"` drops the value of `name` into the text.",
+    "`word.upper()` hands back an uppercase copy of a piece of text; `len(word)` gives its length."
+  ],
+  blocks: [
+    {t:"p", x:"Here is a shape you will write over and over: make an empty list, loop over something, keep the ones you want, append them to the new list. Four lines, and the middle two do the thinking."},
+    {t:"code", src:'birds = ["heron", "wren", "crow", "kite"]\n\nshort = []\nfor bird in birds:\n    if len(bird) == 4:\n        short.append(bird)\n\nprint(short)',
+      note:"The long form. Nothing wrong with it - it is clear, and it will never be wrong."},
+    {t:"rule", x:"`[EXPRESSION for ITEM in THINGS]` builds a new list by working out EXPRESSION once for every item. It is the same four lines, written as one, and it hands the finished list back rather than changing an existing one."},
+    {t:"rule", x:"**Do not read a comprehension left to right.** Read it in three steps: **(1) the middle** — `for x in things` — what is being looped over. **(2) the end** — `if ...`, if there is one — which of them are kept. **(3) the front** — the expression — what gets made from each one that survived. The front is written first and happens last. That inversion is the entire reason they are hard to read, and a procedure beats a feel for it."},
+    {t:"table", head:["in the four-line form","where it goes in the one-line form"], rows:[
+      ["short = []",                 "nowhere — the square brackets are what make the list."],
+      ["for bird in birds:",         "**the middle.** Read this first: `for bird in birds`."],
+      ["if len(bird) == 4:",         "**the end.** Read this second: `if len(bird) == 4`."],
+      ["short.append(bird)",         "**the front.** Read this last: the expression before the `for`."]
+    ]},
+    {t:"code", src:'birds = ["heron", "wren", "crow", "kite"]\n\nshort = [bird for bird in birds if len(bird) == 4]\n\nprint(short)',
+      note:"The same result as the four-line version above. Read it middle, end, front."},
+    {t:"rule", x:"The expression at the front can be anything, not just the item itself: `[word.upper() for word in words]` makes a list of uppercase copies, `[len(word) for word in words]` a list of lengths."},
+    {t:"code", src:'words = ["willow", "alder", "birch"]\nprint([word.upper() for word in words])\nprint([len(word) for word in words])\nprint([f"the {word} tree" for word in words])',
+      note:"Three comprehensions over the same list. Only the front changes."},
+    {t:"warn", x:"There are two different things that both use `if`, and the position is the only clue. An `if` at **the end** is a filter — some items are left out, and the new list may be shorter. An `if ... else` at **the front** is a choice — every item produces something, and the new list is always the same length. They read almost identically and catch everyone."},
+    {t:"table", head:["written","what it means"], rows:[
+      ["[x for x in things if cond]",        "**a filter.** Items where cond is False are left out entirely. Shorter list."],
+      ["[x if cond else y for x in things]", "**a choice.** Every item produces either x or y. Same length, always."]
+    ]},
+    {t:"code", src:'birds = ["heron", "wren", "crow", "kite"]\n\nprint([bird for bird in birds if len(bird) == 4])\nprint([bird if len(bird) == 4 else "-" for bird in birds])',
+      note:"Filter, then choice. Count the items in each line of output - three and four."},
+    {t:"rule", x:"`{KEY: VALUE for ITEM in THINGS}` builds a **dictionary** instead. Same shape, curly braces and a colon. The reading procedure is identical."},
+    {t:"code", src:'words = ["wren", "heron"]\n\nlengths = {word: len(word) for word in words}\nprint(lengths)\nprint(lengths["heron"])',
+      note:"Each word becomes a key, each length the value it points at."},
+    {t:"rule", x:"`\"separator\".join(pieces)` glues a list of pieces of text into one piece, putting the separator between them. It pairs with a comprehension constantly, and it is the usual way to turn a list into a sentence."},
+    {t:"code", src:'birds = ["heron", "wren", "crow"]\n\nprint(", ".join(birds))\nprint(" and ".join([bird.upper() for bird in birds]))',
+      note:"A comprehension makes the pieces, join puts them together. Note that join needs every piece to be text already."},
+    {t:"note", x:"**When not to use one.** If it will not sit comfortably on one line, if it needs two `for`s, or if the expression at the front is doing real work — write the four-line loop. The only argument for a comprehension is that the short one is *easier* to read; past a certain length that stops being true, and Python will cheerfully let you keep going long after it has stopped being true."},
+    {t:"note", x:"And a plain statement, since this is the lesson where people quietly decide they are bad at this: the long form is **never wrong**. It is not the beginner's version of anything. What you genuinely need from this lesson is the ability to *read* a comprehension, because other people's code is full of them — that is what the three-step procedure above is for. Writing them is optional, forever."},
+    {t:"ex", id:"co1",
+      prompt:"Below is the long form. Rewrite it as a single comprehension attached to `shouted`, keeping the print. Expected output:\n\n['WILLOW', 'ALDER', 'BIRCH']",
+      starter:'words = ["willow", "alder", "birch"]\n\nshouted = []\nfor word in words:\n    shouted.append(word.upper())\n\nprint(shouted)',
+      check:{ out:"['WILLOW', 'ALDER', 'BIRCH']",
+              require:[["\\[[^\\]]*\\bfor\\b[^\\]]*\\]", "write it as a comprehension - square brackets with a for inside them"]],
+              forbid:[["append", "the comprehension replaces the append entirely"]] },
+      hints:["Middle first: for word in words. Front last: word.upper().",
+             "shouted = [word.upper() for word in words]"],
+      solution:'words = ["willow", "alder", "birch"]\n\nshouted = [word.upper() for word in words]\n\nprint(shouted)'},
+    {t:"ex", id:"co2",
+      prompt:"From the list below, build and print a list of only the names with exactly four letters. Use one comprehension. Expected output:\n\n['wren', 'crow', 'kite']",
+      starter:'birds = ["heron", "wren", "crow", "kite"]\n',
+      check:{ out:"['wren', 'crow', 'kite']",
+              require:[["\\[[^\\]]*\\bfor\\b[^\\]]*\\bif\\b[^\\]]*\\]", "put the if at the end, inside the brackets, as a filter"]],
+              forbid:[["append", "no append - the comprehension builds the list"]] },
+      hints:["This is a filter, so the if goes at the end, after the for.",
+             "The front is just the item itself, unchanged.",
+             "print([bird for bird in birds if len(bird) == 4])"],
+      solution:'birds = ["heron", "wren", "crow", "kite"]\nprint([bird for bird in birds if len(bird) == 4])'},
+    {t:"ex", id:"co3",
+      prompt:"Build a dictionary from the list below in which each word is a key and its length is the value, then print it. Expected output:\n\n{'wren': 4, 'heron': 5}",
+      starter:'words = ["wren", "heron"]\n',
+      check:{ out:"{'wren': 4, 'heron': 5}",
+              require:[["\\{[^}]*\\bfor\\b[^}]*\\}", "use a dictionary comprehension - curly braces, with a colon between key and value"],
+                       ["len\\s*\\(", "work the length out with len() rather than typing the numbers"]] },
+      hints:["Curly braces instead of square ones, and a colon between the key and the value.",
+             "The key is the word, the value is len(word).",
+             "print({word: len(word) for word in words})"],
+      solution:'words = ["wren", "heron"]\nprint({word: len(word) for word in words})'}
+  ],
+  cards: [
+    {q:"In what order do you read a comprehension?", a:"Middle first - for x in things. Then the end - the if, if there is one. Then the front - the expression. The front is written first and happens last, which is why left-to-right fails."},
+    {q:"What is the difference between [x for x in things if cond] and [x if cond else y for x in things] ?", a:"The first is a filter at the end: items may be left out, so the list can be shorter. The second is a choice at the front: every item produces something, so the length never changes."},
+    {q:"How do you write a dictionary comprehension?", a:"{KEY: VALUE for ITEM in THINGS} - curly braces and a colon. Same reading order as a list one."},
+    {q:"When should you write the four-line loop instead of a comprehension?", a:"Whenever the comprehension will not sit comfortably on one line, needs two fors, or has real work in the expression. The long form is never wrong."},
+    {q:"What does \", \".join(pieces) do?", a:"Glues a list of text pieces into one piece with the separator between them. Every piece has to be text already."}
+  ]
+},
+
+/* ── 11 ────────────────────────────────────────────────────── */
+{
+  id: "funcs", title: "Making your own verbs", minutes: 12,
+  why: "So that you can use a piece of behaviour by its name and stop holding its insides in your head. This is not an optimisation — it is the mechanism by which programs stay possible to think about at all.",
+  known: [
+    "`name = value` attaches a name to a value.",
+    "`for item in things:` repeats its indented block once per item.",
+    "`if CONDITION:` / `else:` choose a branch. Indentation says what is inside.",
+    "`[a, b, c]` is a list, `things.append(x)` adds to it, `len(things)` counts it.",
+    "`print(X)` writes X to the output; `f\"text {name}\"` drops a value into the text."
+  ],
+  blocks: [
+    {t:"rule", x:"`def name(parameters):` starts a function. The indented lines underneath are its body, and they do not run when you write them — only when something *calls* the function by writing `name(...)`."},
+    {t:"code", src:'def greet(who):\n    print(f"Hello, {who}")\n\ngreet("Vee")\ngreet("world")',
+      note:"Defined once, called twice. Note the definition itself produces no output — the calls do."},
+    {t:"p", x:"`who` is a **parameter**: a name that exists inside the function and gets attached to whatever was handed in at the call. Different call, different attachment, same body."},
+    {t:"rule", x:"`return X` stops the function immediately and hands X back to whoever called it. The call then *is* that value, and you can attach a name to it."},
+    {t:"warn", x:"**`return` and `print` are unrelated and this confusion is worth killing early.** `print` writes something onto the screen for a human to read. `return` hands a value back into the program so the rest of the code can use it. A function that only prints hands back `None` — so `x = greet(\"Vee\")` attaches `x` to nothing at all."},
+    {t:"code", src:'def shout_print(word):\n    print(word.upper())\n\ndef shout_return(word):\n    return word.upper()\n\na = shout_print("otter")\nb = shout_return("otter")\nprint("a is:", a)\nprint("b is:", b)',
+      note:"Same body, one letter of difference. Run it and read the NAMES table: a is None, b is the text. The upper() there is a method on text — it hands back an uppercase version."},
+    {t:"rule", x:"Names created inside a function exist only inside it. Once the function finishes they are gone. This is a feature: it means you can read a function without knowing anything about the rest of the program."},
+    {t:"code", src:'def count_letters(words):\n    total = []\n    for word in words:\n        total.append(len(word))\n    return total\n\nprint(count_letters(["heron", "wren"]))\nprint(total)',
+      note:"The last line is meant to fail — `total` lived inside the function and no longer exists. Read the last line of the error."},
+    {t:"rule", x:"A parameter can have a default: `def greet(who, greeting=\"Hello\"):`. Callers may leave it out, and get the default."},
+    {t:"note", x:"A function is the practical answer to *I cannot keep the whole program in my head*. Give it a name that says what it does, get it right once, and from then on you only need the name and what it hands back. You are allowed to forget the inside. That is what it is for."},
+    {t:"ex", id:"f1",
+      prompt:"Write a function `initial` that takes a piece of text and **returns** its first character. Then print `initial(\"heron\")` and `initial(\"wren\")` — two lines: h, then w.",
+      starter:"",
+      check:{ out:"h\nw", require:[["def\\s+initial\\s*\\(","define a function called initial"],["return\\b","use return, not print, inside the function"]] },
+      hints:["The first character of a piece of text is text[0].",
+             "Inside the function use return, and put the print outside it.",
+             'def initial(text): / (indented) return text[0] / then print(initial("heron"))'],
+      solution:'def initial(text):\n    return text[0]\n\nprint(initial("heron"))\nprint(initial("wren"))'},
+    {t:"ex", id:"f2",
+      prompt:"Write a function `longest` that takes a list of words and returns the longest one. Call it with [\"wren\", \"heron\", \"kite\"] and print the result. Expected output:\n\nheron",
+      starter:"",
+      check:{ out:"heron", require:[["def\\s+longest\\s*\\(","define a function called longest"],["return\\b","use return"]] },
+      hints:["Keep a name attached to the best word found so far; start it as the first item.",
+             "Loop over the words; if len(word) > len(best), reattach best to word.",
+             "Return best after the loop — at one level of indentation, inside the function but outside the for."],
+      solution:'def longest(words):\n    best = words[0]\n    for word in words:\n        if len(word) > len(best):\n            best = word\n    return best\n\nprint(longest(["wren", "heron", "kite"]))'}
+  ],
+  cards: [
+    {q:"What is the difference between return and print?", a:"print writes something on the screen for a person. return hands a value back into the program for the rest of the code to use. A function that only prints returns None."},
+    {q:"When does the body of a def actually run?", a:"Only when the function is called by name. Writing the def just creates it — it produces no output on its own."},
+    {q:"What happens to names created inside a function when it finishes?", a:"They stop existing. That is deliberate: it means a function can be read and trusted without knowing the rest of the program."}
+  ]
+},
+
+/* ── 12 ────────────────────────────────────────────────────── */
+{
+  id: "errors", title: "When it breaks", minutes: 11,
+  why: "You will spend more of your life reading error messages than writing new lines. They are not failure reports — they are the most direct thing the machine ever says to you.",
+  known: [
+    "`name = value` attaches a name. `print(X)` writes X out.",
+    "`\"text\"` is a str, `12` is an int, and `+` joins strs but adds ints.",
+    "`things[0]` is the first list item; `d[key]` looks up a dictionary key.",
+    "`def name(args):` makes a function; `return` hands a value back.",
+    "`f\"text {name}\"` drops a value into text, `f\"{name!r}\"` drops in its repr, and `f\"{name=}\"` prints the name and its value together."
+  ],
+  blocks: [
+    {t:"rule", x:"**Read the last line of a traceback first.** It names the kind of error and what specifically was wrong. The lines above it only say where — and you usually do not need them until you have read the bottom."},
+    {t:"p", x:"The middle of a traceback is a chain of \"this line called that line, which called this one\". Long tracebacks are not scarier than short ones; they are just deeper chains. The bottom line is still the sentence that matters."},
+    {t:"table", head:["error","what it actually means"], rows:[
+      ["NameError",        "you used a name that does not exist. Usually a typo, or text you forgot to put quotes around, or a line you never actually ran."],
+      ["TypeError",        "the kinds do not fit — most often a str and an int being added. Wrap with str() or int()."],
+      ["SyntaxError",      "Python could not read the line at all. Look for a missing colon at the end of an if/for/def, or an unclosed bracket or quote — and check the line ABOVE the one it names."],
+      ["IndentationError", "the spacing does not line up. Four spaces per level, and never mix tabs and spaces."],
+      ["IndexError",       "you asked for a list position that is not there. Often an empty list, or an index one past the end."],
+      ["KeyError",         "that key is not in the dictionary. Use d.get(key, default) if it might be missing."],
+      ["AttributeError",   "you asked for a .something the value does not have — often because the value is not the kind you thought. Print its type() and look."],
+      ["ValueError",       "the right kind of thing but an impossible value, e.g. int(\"heron\")."],
+      ["ZeroDivisionError","something was divided by zero."]
+    ]},
+    {t:"note", x:"When you have no idea what a value actually is, do not reason about it — print it. `print(f\"{x=}\")` on the line before the error, or `print(type(x), repr(x))` when you want the kind as well, tells you more in one second than ten minutes of staring. The NAMES table under every run does the same job for everything at once."},
+    {t:"rule", x:"`#` starts a comment. Everything after it on that line is ignored by Python entirely."},
+    {t:"note", x:"Write more comments than feel necessary, and write them about **intent**, not mechanism — not \"loop over the list\" but \"we only keep the four-letter ones because the export format is fixed-width\". Six months from now the code will still say what it does; only the comment will say what you meant. Treat comments as notes to a stranger who happens to have your job."},
+    {t:"code", src:'# this one is meant to fail — read the bottom line\nbirds = ["heron", "wren"]\nprint(birds[5])',
+      note:"IndexError. Two items exist; position 5 does not."},
+    {t:"ex", id:"e1",
+      prompt:"Three broken lines. Run it, read the bottom line of the error, fix that one thing, run again. Repeat until it prints:\n\nHELLO\n3 birds",
+      starter:'greeting = hello\nprint(greeting.upper())\ncount = 3\nprint(count + " birds")',
+      check:{ out:"HELLO\n3 birds" },
+      hints:["First error: hello has no quotes, so Python reads it as a name that does not exist.",
+             "Second error: count is an int and \" birds\" is text — + will not mix them.",
+             'greeting = "hello" and print(str(count) + " birds")'],
+      solution:'greeting = "hello"\nprint(greeting.upper())\ncount = 3\nprint(str(count) + " birds")'},
+    {t:"ex", id:"e2",
+      prompt:"This one has a missing piece of punctuation and a wrong indentation. Fix both so it prints:\n\nwren\nkite",
+      starter:'birds = ["wren", "kite"]\nfor bird in birds\nprint(bird)',
+      check:{ out:"wren\nkite", require:[["for\\b","keep the for loop"]] },
+      hints:["A for line must end with a colon.",
+             "The print must be indented, or it is not inside the loop."],
+      solution:'birds = ["wren", "kite"]\nfor bird in birds:\n    print(bird)'}
+  ],
+  cards: [
+    {q:"Which line of a traceback do you read first?", a:"The last one. It names the kind of error and what was wrong. The lines above only say where."},
+    {q:"You get a SyntaxError on a line that looks fine. What next?", a:"Check the line above it — an unclosed bracket or quote on the previous line makes Python complain about the next one. Also check for a missing colon at the end of an if/for/def."},
+    {q:"What should a comment say?", a:"Why, not what. The code already says what it does; only the comment can say what you meant by it."}
+  ]
+},
+
+/* ── 13 ────────────────────────────────────────────────────── */
+{
+  id: "catch", title: "Catching it", minutes: 12,
+  why: "Some errors are your mistake and want fixing. Others are not yours at all - a file that is not there, a person who typed a word where a number was wanted - and for those you want the program to carry on deliberately instead of stopping.",
+  known: [
+    "The last line of a traceback names the kind of error and what was wrong.",
+    "`int(X)` makes a whole number out of text that looks like one, and raises `ValueError` when it does not.",
+    "`d[key]` looks up a dictionary key and raises `KeyError` when it is not there.",
+    "`things[0]` is the first list item and raises `IndexError` when there is nothing there.",
+    "`for item in things:` repeats its indented block once per item.",
+    "`f\"text {name}\"` drops the value of `name` into the text, and `f\"{name!r}\"` drops in its repr.",
+    "`def name(args):` makes a function; `return` hands a value back."
+  ],
+  blocks: [
+    {t:"rule", x:"`try:` takes an indented block. `except SomeError:` takes another. If nothing goes wrong the except block is skipped entirely. If that error happens, Python abandons the rest of the try **at that point** and runs the except instead."},
+    {t:"code", src:'answer = "seven"\n\ntry:\n    number = int(answer)\n    print(f"got the number {number}")\nexcept ValueError:\n    print(f"{answer!r} is not a number I can use")',
+      note:'Change "seven" to "7" and run it again. Same code, the other branch.'},
+    {t:"p", x:"Note where the try block stopped. The `print` on the line after `int(answer)` never ran, because the failure happened before it. Everything from the failing line to the end of the try block is skipped."},
+    {t:"rule", x:"Name the error you expect. `except ValueError:` catches a `ValueError` and nothing else — anything else still stops the program, which is what you want."},
+    {t:"warn", x:"**Never write a bare `except:`.** It catches everything: your own typos, a `NameError` in a line you have not tested, the interrupt you press to stop a runaway program. It turns a clear message into silence, and a bug that would have announced itself on the first run instead hides for six months. Name what you expect. If you genuinely mean *anything*, `except Exception as e:` and then print `e` — but be sure you mean it."},
+    {t:"rule", x:"`except SomeError as e:` attaches the name `e` to the error itself. `print(e)` gives you the message that would have been on the last line of the traceback."},
+    {t:"code", src:'for answer in ["12", "heron"]:\n    try:\n        print(int(answer))\n    except ValueError as e:\n        print(f"could not use {answer!r} - Python said: {e}")',
+      note:"The error object, caught and asked what it was about. That message is often better than anything you would have written."},
+    {t:"rule", x:"You may write several `except` blocks. Python checks them top to bottom and runs the first one that matches — the same shape as `if` / `elif`, and as with that, exactly one of them runs."},
+    {t:"code", src:'homes = {"otter": "river"}\n\nfor animal in ["otter", "badger"]:\n    try:\n        print(f"the {animal} lives in the {homes[animal]}")\n    except KeyError:\n        print(f"I do not know where the {animal} lives")\n    except TypeError:\n        print("that was not something I could look up at all")',
+      note:"Two named errors, one try. Only the KeyError happens here; the TypeError block sits unused, which is the normal state of most except blocks."},
+    {t:"table", head:["written","when it runs"], rows:[
+      ["try:",     "always. Python starts here, and abandons the rest of the block the moment something goes wrong."],
+      ["except E:", "only when an error of kind E happened inside the try."],
+      ["else:",    "only when the try finished with nothing going wrong. Rarely needed, but clearer than putting the line inside the try."],
+      ["finally:", "always, either way, at the end. For tidying up that must happen whatever happened."]
+    ]},
+    {t:"code", src:'for answer in ["12", "heron"]:\n    try:\n        number = int(answer)\n    except ValueError:\n        print(f"{answer!r} is not a number")\n    else:\n        print(f"{answer!r} came through as {number}")\n    finally:\n        print("- done with that one")',
+      note:"All four in one shape. Read the output against the table above: the finally line appears both times, the else line only once."},
+    {t:"note", x:"The judgement that matters, and it is a judgement rather than a rule: `try` / `except` is for things **outside your control** — a missing file, a network that is down, text that came from a person. It is not for your own mistakes. A `NameError` or a `TypeError` in your own code is a bug, and wrapping it in an except does not fix it, it hides it somewhere it will be much harder to find. When you can simply check first — `if key in d:` — that is usually the clearer thing to write."},
+    {t:"rule", x:"`raise ValueError(\"message\")` raises one on purpose. This is how a function of yours says *you have handed me something I cannot work with*, instead of limping on and producing nonsense further down."},
+    {t:"code", src:'def initial(word):\n    if word == "":\n        raise ValueError("initial() needs a word with at least one letter")\n    return word[0]\n\nprint(initial("heron"))\nprint(initial(""))',
+      note:"The second call is meant to fail. Read the last line of the traceback - it is the sentence you wrote yourself, which is the whole point of raising it."},
+    {t:"note", x:"Failing early and loudly, with a message that says what was wrong, is kinder to you later than carrying on quietly. Most of the worst debugging sessions of your life will be about something that did not raise when it should have."},
+    {t:"ex", id:"ca1",
+      prompt:"Loop over [\"12\", \"heron\", \"4\"]. For each one, try to turn it into a whole number. Print `12 is a number` when it works and `heron is not a number` when it does not. Expected output:\n\n12 is a number\nheron is not a number\n4 is a number",
+      starter:'answers = ["12", "heron", "4"]\n',
+      check:{ out:"12 is a number\nheron is not a number\n4 is a number",
+              require:[["try\\s*:", "use a try block"], ["except\\s+ValueError", "catch ValueError by name"]],
+              forbid:[["except\\s*:", "name the error you expect rather than writing a bare except:"]] },
+      hints:["int(answer) is the line that may fail, so it goes inside the try.",
+             "The success print goes inside the try too, after the int - it should not run when the int failed.",
+             'try: / number = int(answer) / print(f"{answer} is a number") / except ValueError: / print(f"{answer} is not a number")'],
+      solution:'answers = ["12", "heron", "4"]\nfor answer in answers:\n    try:\n        number = int(answer)\n        print(f"{answer} is a number")\n    except ValueError:\n        print(f"{answer} is not a number")'},
+    {t:"ex", id:"ca2",
+      prompt:"Using the dictionary below, look up each of \"otter\" and \"badger\" and print exactly:\n\nthe otter lives in the river\nI do not know where the badger lives\n\nCatch the error by name rather than checking first, so that the shape is the one this lesson is about.",
+      starter:'homes = {"otter": "river", "heron": "reeds"}\n',
+      check:{ out:"the otter lives in the river\nI do not know where the badger lives",
+              require:[["try\\s*:", "use a try block"], ["except\\s+KeyError", "catch KeyError by name"]],
+              forbid:[["except\\s*:", "name the error you expect rather than writing a bare except:"],
+                      ["\\.get\\s*\\(", "use try / except here rather than .get() - that is the point of the exercise"]] },
+      hints:["Loop over the list [\"otter\", \"badger\"].",
+             "homes[animal] is the line that may raise KeyError, so the print containing it goes inside the try.",
+             'except KeyError: then print(f"I do not know where the {animal} lives")'],
+      solution:'homes = {"otter": "river", "heron": "reeds"}\nfor animal in ["otter", "badger"]:\n    try:\n        print(f"the {animal} lives in the {homes[animal]}")\n    except KeyError:\n        print(f"I do not know where the {animal} lives")'}
+  ],
+  cards: [
+    {q:"What happens to the rest of a try block when something goes wrong partway through it?", a:"It is abandoned at that point. Python jumps straight to the matching except block; no later line in the try runs."},
+    {q:"Why should you never write a bare `except:` ?", a:"It catches everything, including your own typos and the interrupt that stops a runaway program, and replaces a clear error message with silence. Name the error you expect."},
+    {q:"What is try/except actually for?", a:"Things outside your control - a missing file, a network that is down, text typed by a person. Not your own bugs: wrapping a NameError in an except hides it rather than fixing it."},
+    {q:"What is the difference between except, else and finally?", a:"except runs only when that error happened; else runs only when nothing went wrong; finally runs either way, at the end, for tidying up."},
+    {q:"What does `raise ValueError(\"message\")` do, and why write one?", a:"Raises that error deliberately, so a function can refuse input it cannot work with instead of limping on and producing nonsense further down."}
+  ]
+},
+
+/* ── 14 ────────────────────────────────────────────────────── */
+{
+  id: "files", title: "Keeping things", minutes: 10,
+  why: "Everything so far vanishes the moment the program ends. A file is the smallest way to make something outlive the run.",
+  known: [
+    "`\"text\"` is a str. `+` joins two strs, and `f\"text {name}\"` drops a value into the text.",
+    "`for item in things:` repeats its indented block once per item.",
+    "`things.append(x)` adds to a list. `[a, b]` is a list.",
+    "`try:` / `except SomeError:` runs the except block when that named error happens inside the try, instead of stopping.",
+    "`def name(args):` makes a function; `return` hands a value back.",
+    "Indentation, four spaces per level, says which lines are inside a block."
+  ],
+  blocks: [
+    {t:"note", x:"Python here is running inside your browser tab, on a small pretend filesystem that resets when the page reloads. The code is exactly the code you would write on a real machine and it behaves exactly the same — the file just does not outlive the tab. That is fine for learning the shape of it."},
+    {t:"rule", x:"`with open(\"name.txt\", \"w\") as f:` opens a file and attaches `f` to it for the indented block underneath. When the block ends the file is closed for you, even if something goes wrong. Always use the `with` form."},
+    {t:"table", head:["mode","what it does"], rows:[
+      ['"w"', "write. Creates the file, and **erases anything already in it**."],
+      ['"a"', "append. Creates it if needed, adds to the end, keeps what was there."],
+      ['"r"', "read. Raises FileNotFoundError if it is not there."]
+    ]},
+    {t:"code", src:'with open("birds.txt", "w") as f:\n    f.write("heron\\n")\n    f.write("wren\\n")\n\nwith open("birds.txt", "r") as f:\n    print(f.read())',
+      note:'`\\n` inside text means "a new line here". f.write does not add one for you — unlike print, which always does.'},
+    {t:"rule", x:"`f.read()` hands back the whole file as one piece of text. Looping — `for line in f:` — hands back one line at a time, each with its `\\n` still on the end."},
+    {t:"rule", x:"`text.strip()` hands back a copy with whitespace removed from both ends, including that trailing newline. You will use it on nearly every line you read from a file."},
+    {t:"code", src:'with open("birds.txt", "w") as f:\n    f.write("heron\\nwren\\ncrow\\n")\n\nnames = []\nwith open("birds.txt", "r") as f:\n    for line in f:\n        names.append(line.strip())\n\nprint(names)',
+      note:"Read the file into a list, one stripped line per item. Take the .strip() off and re-run to see the newlines survive into the list."},
+    {t:"warn", x:'Opening with `"w"` erases the file the instant it opens, before you have written a single thing. If you meant to add to it, you wanted `"a"`.'},
+    {t:"rule", x:"Opening a file for reading that is not there raises `FileNotFoundError`. A file your program did not create is exactly the kind of thing outside your control, so this is the textbook case for `try:` / `except FileNotFoundError:`."},
+    {t:"code", src:'try:\n    with open("nowhere.txt", "r") as f:\n        print(f.read())\nexcept FileNotFoundError:\n    print("that file is not there - nothing to read")',
+      note:'Handled rather than stopped. Change the name to birds.txt, after running the example above that creates it, and the other branch runs instead.'},
+    {t:"ex", id:"fi1",
+      prompt:"Write the three lines alder, birch, willow into a file called trees.txt — one per line. Then read the file back and print each line with a \"- \" in front of it:\n\n- alder\n- birch\n- willow",
+      starter:"",
+      check:{ out:"- alder\n- birch\n- willow", require:[["open\\s*\\(","use open(...)"],["strip\\s*\\(","use .strip() to remove the newline"]] },
+      hints:['Write with "w", then open again with "r" to read.',
+             "Each line you read still has a \\n on the end — strip() it before printing.",
+             'for line in f: then print(f"- {line.strip()}")'],
+      solution:'with open("trees.txt", "w") as f:\n    f.write("alder\\nbirch\\nwillow\\n")\n\nwith open("trees.txt", "r") as f:\n    for line in f:\n        print(f"- {line.strip()}")'}
+  ],
+  cards: [
+    {q:"Why use `with open(...) as f:` rather than plain open()?", a:"The file is closed automatically when the indented block ends, even if an error is raised inside it."},
+    {q:"What is the danger of opening a file with mode \"w\"?", a:"It erases the existing contents immediately on opening. Use \"a\" to add to the end instead."},
+    {q:"Why does nearly every line read from a file get .strip() called on it?", a:"Lines come back with their trailing newline attached. strip() removes whitespace from both ends, newline included."}
+  ]
+},
+
+/* ── 15 ────────────────────────────────────────────────────── */
+{
+  id: "imports", title: "Other people's work", minutes: 9,
+  why: "Almost nothing you want to do is unwritten. The standard library ships with Python and covers an enormous amount of it — knowing it exists is most of the benefit.",
+  known: [
+    "`name = value` attaches a name. `print(X)` writes X out.",
+    "`[a, b, c]` is a list; `{key: value}` is a dictionary.",
+    "`def name(args):` makes a function; `return` hands a value back.",
+    "`f\"text {name}\"` drops a value into the text.",
+    "`with open(name, mode) as f:` opens a file for the indented block."
+  ],
+  blocks: [
+    {t:"rule", x:"`import random` makes a module available under its own name; you then reach into it with a dot: `random.choice(...)`. It goes at the top of the file."},
+    {t:"rule", x:"`from datetime import date` takes one specific thing out of a module so you can use it unqualified: `date.today()`. Both forms are normal; the first keeps it obvious where a name came from."},
+    {t:"code", src:'import random\n\nbirds = ["heron", "wren", "crow", "kite"]\nprint(random.choice(birds))\nprint(random.sample(birds, 2))',
+      note:"Run it more than once — the output changes. random.sample picks that many, without repeats."},
+    {t:"p", x:"A short list of standard-library modules worth knowing exist, so that you recognise the name when you meet it:"},
+    {t:"table", head:["module","for"], rows:[
+      ["random",   "choosing, shuffling, sampling."],
+      ["json",     "turning lists and dictionaries into text and back — how you save structured data to a file."],
+      ["datetime", "dates and times, and the difference between two of them."],
+      ["pathlib",  "file paths, done properly. Path(\"notes\") / \"a.txt\"."],
+      ["os",       "the surrounding machine — environment variables, directory listings."],
+      ["re",       "finding patterns in text. Powerful, and worth its own afternoon."],
+      ["collections", "Counter, defaultdict — better shapes for counting and grouping."],
+      ["statistics", "mean, median and friends, without writing them yourself."],
+      ["csv",      "reading and writing spreadsheet-shaped files."],
+      ["textwrap", "wrapping and indenting blocks of text."]
+    ]},
+    {t:"rule", x:"`json.dumps(x)` turns a list or dictionary into text. `json.loads(s)` turns that text back into the list or dictionary. This pair is how almost everything gets saved, sent, and loaded again — including the progress this page keeps for you."},
+    {t:"code", src:'import json\n\nrecord = {"name": "wren", "home": "hedge", "seen": ["tuesday", "friday"]}\nas_text = json.dumps(record)\nprint(as_text)\nprint(type(as_text))\n\nback = json.loads(as_text)\nprint(back["home"])',
+      note:"Out to text, and back again unharmed. Read the NAMES table: as_text is a str, back is a dict."},
+    {t:"p", x:"Modules that do not ship with Python — requests, pandas, numpy and the rest — are installed with `pip install name` at a terminal, not from inside the program. That step is outside this page, and it is the next thing to learn after this file."},
+    {t:"ex", id:"m1",
+      prompt:"Import json. Build a dictionary attached to `note` with \"tool\" giving \"chisel\" and \"kept\" giving True. Turn it into text, print that text, then load it back and print just the value for \"tool\". Expected output:\n\n{\"tool\": \"chisel\", \"kept\": true}\nchisel",
+      starter:"import json\n\n",
+      check:{ out:'{"tool": "chisel", "kept": true}\nchisel', require:[["json\\.dumps","use json.dumps"],["json\\.loads","use json.loads"]] },
+      hints:["json.dumps(note) hands back text — attach a name to it and print that.",
+             "Note that Python's True becomes json's lowercase true. That is correct, not a mistake.",
+             'text = json.dumps(note) / print(text) / back = json.loads(text) / print(back["tool"])'],
+      solution:'import json\n\nnote = {"tool": "chisel", "kept": True}\ntext = json.dumps(note)\nprint(text)\nback = json.loads(text)\nprint(back["tool"])'}
+  ],
+  cards: [
+    {q:"What is the difference between `import random` and `from random import choice`?", a:"The first makes the module available and you reach in with random.choice(...). The second lifts one name out so you write choice(...) directly. The first keeps the origin visible."},
+    {q:"What do json.dumps and json.loads do?", a:"dumps turns a list or dictionary into text; loads turns that text back into the list or dictionary. This pair is how structured data gets saved and reloaded."},
+    {q:"How do you get a module that does not ship with Python?", a:"pip install name, run at a terminal — not from inside the program."}
+  ]
+},
+
+/* ── 16 ────────────────────────────────────────────────────── */
+{
+  id: "classes", title: "Making a kind of your own", minutes: 14,
+  why: "You have been using objects since the first lesson - every dot you have typed was one. A class is how you make a new kind of thing, for when some data and some behaviour belong together and keep travelling together.",
+  known: [
+    "`def name(parameters):` makes a function; the indented body runs only when it is called. `return X` hands X back to the caller.",
+    "Names created inside a function stop existing when it finishes.",
+    "`{key: value}` is a dictionary; `d[key]` looks one up and `d[key] = v` sets one.",
+    "`[a, b, c]` is a list; `things.append(x)` adds to the end.",
+    "`f\"text {name}\"` drops a value into text; `f\"{name!r}\"` drops in its repr, with the quotes.",
+    "`type(X)` tells you what kind of thing X is.",
+    "`name = value` attaches a name to a value."
+  ],
+  blocks: [
+    {t:"p", x:"Every one of these has already appeared in this file: `\"heron\".upper()`, `birds.append(\"wren\")`, `homes.items()`, `f.read()`, `line.strip()`. In each one, the thing before the dot is an **object**, and the dot means *ask this thing to do something it already knows how to do*. You have been working with objects the whole time; nobody made a fuss about it because there was nothing to make a fuss about."},
+    {t:"rule", x:"Every object has a **class** — the kind of thing it is. That is what `type(X)` has been reporting all along, and it has been saying the word since the lesson on kinds."},
+    {t:"code", src:'print(type("heron"))\nprint(type(["heron"]))\nprint(type({"a": 1}))', note:"The word class, in the output, for three things you already use daily."},
+    {t:"rule", x:"`class Name:` starts a new kind, with an indented block of `def`s underneath. Class names are written in CapitalisedWords — the one place in Python where that convention applies."},
+    {t:"rule", x:"`def __init__(self, ...):` runs automatically whenever you make one of these. Its whole job is to attach the starting values. The two underscores on each side mark it as a name Python itself calls; you write it, you never call it."},
+    {t:"rule", x:"**`self` is the object itself**, handed in automatically as the first parameter of every method. You write it in the `def` and you never pass it at the call: `heron.describe()` quietly becomes `describe(heron)`. That is the whole trick and there is nothing else hidden in it."},
+    {t:"rule", x:"`self.something = value` attaches a value **to the object**, where it survives after the method finishes — unlike an ordinary name inside a function, which vanishes. That difference is the entire reason classes exist."},
+    {t:"code", src:'class Bird:\n    def __init__(self, name, home):\n        self.name = name\n        self.home = home\n\n    def describe(self):\n        return f"the {self.name} lives in the {self.home}"\n\nheron = Bird("heron", "reeds")\nwren = Bird("wren", "hedge")\n\nprint(heron.describe())\nprint(wren.describe())\nprint(heron.name)',
+      note:"Two Birds, made from one class. Run it, then read the NAMES table underneath - and notice how useless it is."},
+    {t:"warn", x:"That is the problem the next rule fixes. Without being told otherwise, an object prints as `<Bird object>` — it tells you its kind and absolutely nothing else. In the names table, in a print, in an error message: nothing."},
+    {t:"rule", x:"`def __repr__(self):` returns the text that Python shows when it needs to display the object. **Write one for every class you make, before you write anything else.** It is not an advanced topic and it is not decoration; it is the difference between being able to look at your own program and not."},
+    {t:"code", src:'class Bird:\n    def __init__(self, name, home):\n        self.name = name\n        self.home = home\n\n    def __repr__(self):\n        return f"Bird({self.name!r}, {self.home!r})"\n\nheron = Bird("heron", "reeds")\nwren = Bird("wren", "hedge")\n\nprint(heron)\nprint([heron, wren])',
+      note:"The same class with one method added. Run it and read the NAMES table again - it now tells you everything."},
+    {t:"note", x:"This matters more here than in most places. Everything this file recommends — the names table under every run, `print(f\"{x=}\")` when you are lost, reading a value rather than holding it — runs through `repr()`. A class without `__repr__` is a hole in exactly that machinery: the one place where looking stops working. Define it first."},
+    {t:"rule", x:"Each object made from a class is separate. Changing one's attachments does not touch another's, even though they came from the same class and share the same methods."},
+    {t:"code", src:'class Bird:\n    def __init__(self, name, home):\n        self.name = name\n        self.home = home\n\n    def __repr__(self):\n        return f"Bird({self.name!r}, {self.home!r})"\n\nheron = Bird("heron", "reeds")\nwren = Bird("wren", "hedge")\n\nheron.home = "the riverbank"\n\nprint(heron)\nprint(wren)',
+      note:"One changed, one untouched."},
+    {t:"rule", x:"A method can change the object it belongs to: `self.things.append(x)` inside a method modifies that object's own list, and the change is still there on the next call."},
+    {t:"code", src:'class Basket:\n    def __init__(self):\n        self.things = []\n\n    def add(self, thing):\n        self.things.append(thing)\n\n    def __repr__(self):\n        return f"Basket({self.things!r})"\n\nbasket = Basket()\nbasket.add("chisel")\nbasket.add("rasp")\nprint(basket)',
+      note:"`__init__` takes no extra parameters here - the starting state is simply an empty list. Two calls to add, both remembered."},
+    {t:"p", x:"Now the part that is a judgement rather than a rule, and the part most material leaves out."},
+    {t:"note", x:"**A class is not the default and not a mark of seriousness.** It earns its place when data and behaviour travel together *and* you have more than one of the thing. If you only have data, a dictionary is usually simpler and better. If you only have behaviour, a function is. An enormous amount of excellent Python contains no classes its author wrote — and code that wraps every function in a class it did not need is a well-known way to make a small program hard to read."},
+    {t:"table", head:["reach for","when"], rows:[
+      ["a dictionary", "you have data and nothing else. Keys can be anything, added and removed freely, no behaviour attached."],
+      ["a function",   "you have behaviour and nothing else — something goes in, something comes back."],
+      ["a class",      "the two are stuck together: several of a thing, each carrying its own state, each knowing how to do things with it."]
+    ]},
+    {t:"p", x:"One more thing exists that this lesson is deliberately not teaching. A class can be built **on top of** another one, taking its methods and changing some — that is called inheritance, and it is the usual next topic. It is also over-used more than almost anything else in the language: most problems people reach for it to solve are better handled by one object simply holding another. Learn it when you meet it in code you have to read, not before."},
+    {t:"ex", id:"cl1",
+      prompt:"Write a class `Tool` whose `__init__` takes a name and what it is used for, and stores both. Give it a method `describe` that **returns** a sentence. Make one with \"chisel\" and \"cutting\", and print its description. Expected output:\n\na chisel is for cutting",
+      starter:"",
+      check:{ out:"a chisel is for cutting",
+              require:[["class\\s+Tool\\s*:", "define a class called Tool"],
+                       ["def\\s+__init__\\s*\\(\\s*self", "give it an __init__ taking self first"],
+                       ["def\\s+describe\\s*\\(\\s*self", "give it a describe method taking self"],
+                       ["return\\b", "describe should return the sentence, not print it"]] },
+      hints:["Inside __init__, attach the values with self.name = name and self.used_for = used_for.",
+             "describe takes only self, and builds the sentence from self.name and self.used_for.",
+             'return f"a {self.name} is for {self.used_for}" - then print(Tool("chisel", "cutting").describe()) or attach a name to the Tool first.'],
+      solution:'class Tool:\n    def __init__(self, name, used_for):\n        self.name = name\n        self.used_for = used_for\n\n    def describe(self):\n        return f"a {self.name} is for {self.used_for}"\n\nchisel = Tool("chisel", "cutting")\nprint(chisel.describe())'},
+    {t:"ex", id:"cl2",
+      prompt:"Write a class `Tool` whose `__init__` takes just a name, and give it a `__repr__` so that printing the object directly produces exactly:\n\nTool('chisel')\n\nNote the quotes around chisel in the expected output - `!r` inside an f-string gives you those.",
+      starter:"",
+      check:{ out:"Tool('chisel')",
+              require:[["def\\s+__repr__\\s*\\(\\s*self", "define __repr__ taking self"],
+                       ["return\\b", "__repr__ must return the text, not print it"]] },
+      hints:["__repr__ takes only self and returns a piece of text.",
+             'f"Tool({self.name!r})" gives Tool(\'chisel\') - the !r is what adds the quotes.',
+             "Then just print(Tool(\"chisel\")) - printing the object calls __repr__ for you."],
+      solution:'class Tool:\n    def __init__(self, name):\n        self.name = name\n\n    def __repr__(self):\n        return f"Tool({self.name!r})"\n\nprint(Tool("chisel"))'},
+    {t:"ex", id:"cl3",
+      prompt:"Write a class `Basket` that starts with an empty list, has an `add` method that puts something into it, and a `__repr__`. Make one, add \"chisel\" and then \"rasp\", and print it. Expected output:\n\nBasket(['chisel', 'rasp'])",
+      starter:"",
+      check:{ out:"Basket(['chisel', 'rasp'])",
+              require:[["class\\s+Basket\\s*:", "define a class called Basket"],
+                       ["def\\s+add\\s*\\(\\s*self", "give it an add method taking self first"],
+                       ["append", "add should append to the object's own list"],
+                       ["def\\s+__repr__\\s*\\(\\s*self", "give it a __repr__"]] },
+      hints:["__init__ takes only self here, and sets self.things = [].",
+             "add takes self and the thing, and does self.things.append(thing).",
+             'return f"Basket({self.things!r})" in __repr__.'],
+      solution:'class Basket:\n    def __init__(self):\n        self.things = []\n\n    def add(self, thing):\n        self.things.append(thing)\n\n    def __repr__(self):\n        return f"Basket({self.things!r})"\n\nbasket = Basket()\nbasket.add("chisel")\nbasket.add("rasp")\nprint(basket)'}
+  ],
+  cards: [
+    {q:"What is `self` ?", a:"The object itself, handed in automatically as the first parameter of every method. You write it in the def and never pass it at the call: heron.describe() becomes describe(heron)."},
+    {q:"What does `__init__` do, and do you ever call it yourself?", a:"It runs automatically when an object is made, to attach the starting values. You write it; you never call it."},
+    {q:"Why write `__repr__` for every class you make?", a:"Without it an object displays as <Bird object> and tells you nothing - in the names table, in a print, in an error. It is what makes looking at your own program possible, so define it first, not last."},
+    {q:"What is the difference between `self.x = 1` inside a method and `x = 1` inside a plain function?", a:"self.x attaches the value to the object, where it survives after the method finishes. A plain name inside a function stops existing when the function returns."},
+    {q:"When is a dictionary the better choice than a class?", a:"When you have data and nothing else. A class earns its place when data and behaviour travel together and you have several of the thing."},
+    {q:"What is inheritance, and why is it not taught here?", a:"Building one class on top of another, taking its methods and changing some. It is over-used - most cases are better served by one object simply holding another. Learn it when you meet it in code you must read."}
+  ]
+}
+];
+
+/* ══════════════════════════════════════════════════════════════
+   STORAGE — the ledger proper
+
+   Everything is kept in localStorage under one key, as JSON.
+   Progress, every line of code you have written in every cell,
+   the input boxes, your notes, the review schedule, and a
+   timestamped log of every run you have ever made.
+
+   The log is the point. SDAM means the episodic layer does not
+   come back on its own; so it gets written down instead. You are
+   never asked "do you remember doing this" — you can open the
+   ledger and read it.
+   ══════════════════════════════════════════════════════════════ */
+
+const KEY = "ledger.python.v1";
+const MAX_LOG = 500;
+
+function blank() {
+  return {
+    v: 1,
+    created: Date.now(),
+    lastSeen: Date.now(),
+    place: { view: "home", lesson: null },
+    code: {},      /* cellKey -> source you last had in the editor  */
+    inputs: {},    /* cellKey -> the pretend typed input            */
+    done: {},      /* exerciseKey -> timestamp it first passed      */
+    seen: {},      /* lessonId -> timestamp first opened            */
+    log: [],       /* every run, newest last                        */
+    notes: "",
+    cards: {}      /* cardKey -> {box, due, right, wrong}           */
+  };
+}
+
+let S = blank();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (raw) S = Object.assign(blank(), JSON.parse(raw));
+  } catch (e) { /* corrupt or unavailable — carry on with a blank one */ }
+}
+let saveTimer = null;
+function save(now) {
+  clearTimeout(saveTimer);
+  const write = () => {
+    S.lastSeen = Date.now();
+    try { localStorage.setItem(KEY, JSON.stringify(S)); }
+    catch (e) { /* quota or private mode — nothing to do but keep running */ }
+  };
+  if (now) write(); else saveTimer = setTimeout(write, 350);
+}
+load();
+
+const DAY = 86400000;
+const lessonById = (id) => LESSONS.find(l => l.id === id);
+const lessonIndex = (id) => LESSONS.findIndex(l => l.id === id);
+
+function exercisesOf(l) { return l.blocks.filter(b => b.t === "ex"); }
+function exKey(l, b) { return l.id + ":" + b.id; }
+
+function lessonProgress(l) {
+  const ex = exercisesOf(l);
+  const done = ex.filter(b => S.done[exKey(l, b)]).length;
+  return { done, total: ex.length, seen: !!S.seen[l.id], complete: ex.length > 0 && done === ex.length };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   REVIEW SCHEDULE — Leitner boxes, no scoring, no streaks
+
+   Two buttons only: knew it / did not. "Did not" is not a
+   penalty, it just puts the card back in the near queue. Nothing
+   is ever lost by answering honestly, and there is no number
+   going down.
+   ══════════════════════════════════════════════════════════════ */
+
+const BOX_DAYS = [1, 2, 4, 9, 21];
+
+function allCards() {
+  const out = [];
+  for (const l of LESSONS) {
+    if (!S.seen[l.id]) continue;          /* never review something not met */
+    (l.cards || []).forEach((c, i) => out.push({ key: l.id + "#" + i, lesson: l, ...c }));
+  }
+  return out;
+}
+function cardState(key) { return S.cards[key] || { box: 0, due: 0, right: 0, wrong: 0 }; }
+function dueCards() {
+  const now = Date.now();
+  return allCards().filter(c => cardState(c.key).due <= now);
+}
+function gradeCard(key, knew) {
+  const st = cardState(key);
+  if (knew) {
+    st.right++;
+    st.box = Math.min(st.box + 1, BOX_DAYS.length - 1);
+    st.due = Date.now() + BOX_DAYS[st.box] * DAY;
+  } else {
+    st.wrong++;
+    st.box = 0;
+    st.due = Date.now();                  /* comes round again this session */
+  }
+  S.cards[key] = st;
+  save();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PYTHON — real CPython, compiled to WebAssembly, in the tab
+   ══════════════════════════════════════════════════════════════ */
+
+const PYODIDE_VERSIONS = ["0.27.7", "0.26.4", "0.25.1"];
+let py = null;
+let pyPhase = "loading";                  /* loading | ready | failed */
+let pyWaiters = [];
+
+const statEl = document.getElementById("pystat");
+function setStat(text, cls) {
+  statEl.textContent = text;
+  statEl.className = cls || "";
+}
+
+const HARNESS = [
+'import sys, io, json, builtins, traceback, linecache, re, types',
+'',
+'def __ledger_trim(text):',
+'    # keep only frames from the learner\'s own code - the machinery',
+'    # that runs it is not part of what went wrong.',
+'    keep, out = True, []',
+'    for line in text.split("\\n"):',
+'        body = line.lstrip(" ")',
+'        indent = len(line) - len(body)',
+'        if indent == 2 and body.startswith("File \\""):',
+'            keep = "File \\"your code\\"" in line',
+'        elif indent < 2:',
+'            keep = True',
+'        if keep:',
+'            out.append(line)',
+'    return "\\n".join(out)',
+'',
+'def __ledger_run(src, input_text):',
+'    ns = {"__name__": "__main__"}',
+'    buf = io.StringIO()',
+'    queue = [ln for ln in input_text.split("\\n")] if input_text else []',
+'    while queue and queue[-1] == "":',
+'        queue.pop()',
+'    def fake_input(prompt=""):',
+'        buf.write(str(prompt))',
+'        if not queue:',
+'            raise EOFError("ran out of input lines - add another line to the input box below the editor")',
+'        line = queue.pop(0)',
+'        buf.write(line + "\\n")',
+'        return line',
+'    old_out, old_err, old_in = sys.stdout, sys.stderr, builtins.input',
+'    sys.stdout = buf',
+'    sys.stderr = buf',
+'    builtins.input = fake_input',
+'    err = None',
+'    linecache.cache["your code"] = (len(src), None, src.splitlines(True), "your code")',
+'    try:',
+'        exec(compile(src, "your code", "exec"), ns)',
+'    except BaseException as e:',
+'        tb = e.__traceback__',
+'        if tb is not None:',
+'            tb = tb.tb_next',
+'        err = __ledger_trim("".join(traceback.format_exception(type(e), e, tb)))',
+'    finally:',
+'        sys.stdout, sys.stderr, builtins.input = old_out, old_err, old_in',
+'    names = []',
+'    for k, v in ns.items():',
+'        if k.startswith("__"):',
+'            continue',
+'        try:',
+'            if isinstance(v, types.ModuleType):',
+'                r = "<module " + repr(getattr(v, "__name__", "?")) + ">"',
+'            else:',
+'                r = re.sub(r" at 0x[0-9a-fA-F]+", "", repr(v))',
+'        except BaseException:',
+'            r = "<no repr>"',
+'        if len(r) > 240:',
+'            r = r[:240] + " ..."',
+'        names.append({"n": k, "t": type(v).__name__, "v": r})',
+'    return json.dumps({"out": buf.getvalue(), "err": err, "names": names})',
+''
+].join("\n");
+
+function loadScript(src) {
+  return new Promise((res, rej) => {
+    const s = document.createElement("script");
+    s.src = src; s.onload = res; s.onerror = () => rej(new Error("could not load " + src));
+    document.head.appendChild(s);
+  });
+}
+
+async function bootPython() {
+  for (const v of PYODIDE_VERSIONS) {
+    const base = "https://cdn.jsdelivr.net/pyodide/v" + v + "/full/";
+    try {
+      setStat("python: fetching…");
+      await loadScript(base + "pyodide.js");
+      setStat("python: starting…");
+      py = await loadPyodide({ indexURL: base });
+      py.runPython(HARNESS);
+      pyPhase = "ready";
+      setStat("python " + v + " ready", "ready");
+      pyWaiters.forEach(f => f()); pyWaiters = [];
+      return;
+    } catch (e) {
+      console.warn("pyodide " + v + " failed:", e);
+      if (typeof loadPyodide !== "undefined") { try { delete window.loadPyodide; } catch (_) {} }
+    }
+  }
+  pyPhase = "failed";
+  setStat("python unavailable — click", "fail");
+  statEl.onclick = () => alert(
+    "Python could not be downloaded.\n\n" +
+    "This page fetches CPython (compiled to WebAssembly) from a CDN the first time it runs, " +
+    "so it needs a working internet connection on first load. After that the browser caches it.\n\n" +
+    "Everything else still works offline: the lessons, your saved code, the ledger, the notes " +
+    "and the review cards. Only the Run button needs the download."
+  );
+  pyWaiters.forEach(f => f()); pyWaiters = [];
+}
+function pythonReady() {
+  if (pyPhase !== "loading") return Promise.resolve(pyPhase === "ready");
+  return new Promise(res => pyWaiters.push(() => res(pyPhase === "ready")));
+}
+
+async function runPython(src, inputText) {
+  const ok = await pythonReady();
+  if (!ok) return { out: "", err: "Python is not loaded. This page downloads it on first run and needs a connection to do that.", names: [] };
+  try {
+    const raw = py.globals.get("__ledger_run")(src, inputText || "");
+    return JSON.parse(raw);
+  } catch (e) {
+    return { out: "", err: String(e), names: [] };
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RENDERING
+   ══════════════════════════════════════════════════════════════ */
+
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+
+function esc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+function md(s) {
+  let h = esc(s);
+  h = h.replace(/`([^`]+)`/g, '<code class="inl">$1</code>');
+  h = h.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  h = h.replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>");
+  return h.replace(/\n/g, "<br>");
+}
+
+/* Times, said in words. A date is a fact; "three days ago" is the
+   fact you actually wanted. */
+const DAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const MONTHS = ["January","February","March","April","May","June","July",
+                "August","September","October","November","December"];
+function clock(d) {
+  return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+function when(ts) {
+  if (!ts) return "never";
+  const d = new Date(ts), gap = Date.now() - ts;
+  if (gap < 60000) return "just now";
+  if (gap < 3600000) { const m = Math.round(gap / 60000); return m === 1 ? "a minute ago" : m + " minutes ago"; }
+  if (gap < 21600000) { const h = Math.round(gap / 3600000); return h === 1 ? "an hour ago" : h + " hours ago"; }
+  const today = new Date(); today.setHours(0,0,0,0);
+  const then = new Date(ts); then.setHours(0,0,0,0);
+  const days = Math.round((today - then) / DAY);
+  if (days === 0) return "earlier today, at " + clock(d);
+  if (days === 1) return "yesterday, at " + clock(d);
+  if (days < 7) return "last " + DAYS[d.getDay()] + ", at " + clock(d);
+  return DAYS[d.getDay()] + " " + d.getDate() + " " + MONTHS[d.getMonth()] + ", at " + clock(d);
+}
+
+function norm(s) {
+  return String(s == null ? "" : s).replace(/\r/g, "").split("\n")
+    .map(x => x.replace(/[ \t]+$/, "")).join("\n").replace(/^\n+/, "").replace(/\n+$/, "");
+}
+
+/* The structure readout: your own indentation, drawn out, so the
+   block shape is something you read rather than something you hold. */
+function structureHTML(src) {
+  const lines = src.split("\n");
+  const w = String(lines.length).length;
+  let out = "";
+  lines.forEach((raw, i) => {
+    const n = String(i + 1).padStart(w, " ");
+    if (raw.trim() === "") { out += '<span class="ln">' + n + "</span>\n"; return; }
+    const lead = raw.match(/^[ \t]*/)[0];
+    const body = raw.slice(lead.length);
+    let flag = "";
+    if (lead.indexOf("\t") >= 0) flag = "  ← tab character, use four spaces";
+    else if (lead.length % 4 !== 0) flag = "  ← " + lead.length + " spaces, not a multiple of four";
+    const depth = Math.floor(lead.replace(/\t/g, "    ").length / 4);
+    const guide = "│   ".repeat(depth);
+    out += '<span class="ln">' + n + "</span> " +
+           '<span class="gd">' + guide + "</span>" +
+           '<span class="src">' + esc(body) + "</span>" +
+           (flag ? '<span class="bad">' + esc(flag) + "</span>" : "") + "\n";
+  });
+  return out;
+}
+
+/* ── the exercise checker ──────────────────────────────────── */
+function judge(block, res, src) {
+  const c = block.check || {};
+  if (res.err) return { ok: false, why: "Your code stopped with an error. Read the **last line** of it above — that is the sentence that says what went wrong. Everything above it only says where." };
+  if (c.forbid) for (const [re, msg] of c.forbid)
+    if (new RegExp(re).test(src)) return { ok: false, why: "For this one, " + msg + "." };
+  if (c.require) for (const [re, msg] of c.require)
+    if (!new RegExp(re).test(src)) return { ok: false, why: "This exercise wants you to " + msg + " — and it is not there yet." };
+  const got = norm(res.out);
+  if (c.nonempty && got === "") return { ok: false, why: "Nothing was printed. The output is empty." };
+  if (c.contains) for (const s of c.contains)
+    if (got.indexOf(s) < 0) return { ok: false, why: "The output does not contain `" + s + "` yet.", got };
+  if (c.out != null) {
+    const want = norm(c.out);
+    if (got !== want) {
+      const gl = got.split("\n"), wl = want.split("\n");
+      let detail = "wanted:\n" + want + "\n\ngot:\n" + (got === "" ? "(nothing)" : got);
+      if (gl.length !== wl.length)
+        detail = "wanted " + wl.length + " line" + (wl.length === 1 ? "" : "s") +
+                 ", got " + gl.length + ".\n\n" + detail;
+      else {
+        for (let i = 0; i < wl.length; i++) if (wl[i] !== gl[i]) {
+          detail = "line " + (i + 1) + " is not right yet.\n\n" + detail; break;
+        }
+      }
+      return { ok: false, why: "The output is not quite it.", detail };
+    }
+  }
+  return { ok: true };
+}
+
+/* ── code cells ────────────────────────────────────────────── */
+
+function cellHTML(lesson, block, idx) {
+  const key = lesson.id + ":" + (block.id || ("c" + idx));
+  const isEx = block.t === "ex";
+  const passed = isEx && !!S.done[key];
+  const src = S.code[key] != null ? S.code[key] : (isEx ? (block.starter || "") : block.src);
+  const inputs = S.inputs[key] != null ? S.inputs[key] : (block.inputs || "");
+  const wantsInput = /input\s*\(/.test(src) || block.inputs != null || (block.check && block.check.inputs != null);
+  return (
+    '<div class="cell ' + (isEx ? "exercise" : "") + '" data-key="' + key + '" data-lesson="' + lesson.id + '" data-block="' + idx + '">' +
+      '<div class="cellhead">' +
+        '<span class="ctag ' + (isEx ? (passed ? "ok" : "ex") : "") + '">' +
+          (isEx ? (passed ? "exercise · done" : "exercise") : "example") + "</span>" +
+        (isEx ? '<button class="btn ghost act-hint">hint</button>' +
+                '<button class="btn ghost act-sol">show one answer</button>' : "") +
+        '<button class="btn ghost act-reset">reset</button>' +
+      "</div>" +
+      (isEx ? '<div class="prompt">' + md(block.prompt) + "</div>" : "") +
+      '<textarea class="editor" spellcheck="false" rows="' +
+        Math.max(3, src.split("\n").length + 1) + '">' + esc(src) + "</textarea>" +
+      '<div class="inputrow" ' + (wantsInput ? "" : 'style="display:none"') + ">" +
+        '<div class="inputlbl">input lines — what the imaginary person types, one per line</div>' +
+        '<textarea class="inputs" spellcheck="false" rows="2">' + esc(inputs) + "</textarea>" +
+      "</div>" +
+      '<div class="cellbar">' +
+        '<button class="btn run act-run">run</button>' +
+        (block.note ? '<span style="font-size:12.5px;color:var(--dim)">' + md(block.note) + "</span>" : "") +
+        '<span class="spacer"></span>' +
+        '<button class="btn ghost act-struct">structure</button>' +
+      "</div>" +
+      '<div class="out" style="display:none"></div>' +
+      '<div class="verdictslot"></div>' +
+      '<div class="hintslot"></div>' +
+    "</div>"
+  );
+}
+
+function wireCell(el) {
+  const key = el.dataset.key;
+  const lesson = lessonById(el.dataset.lesson);
+  const block = lesson.blocks[Number(el.dataset.block)];
+  const ed = $(".editor", el), inp = $(".inputs", el);
+  const outEl = $(".out", el), vSlot = $(".verdictslot", el), hSlot = $(".hintslot", el);
+  let hintLevel = 0, structOpen = false, lastRes = null;
+
+  const autosize = () => { ed.style.height = "auto"; ed.style.height = (ed.scrollHeight + 2) + "px"; };
+  setTimeout(autosize, 0);
+
+  ed.addEventListener("input", () => {
+    S.code[key] = ed.value; save(); autosize();
+    const row = $(".inputrow", el);
+    if (/input\s*\(/.test(ed.value)) row.style.display = "";
+  });
+  inp.addEventListener("input", () => { S.inputs[key] = inp.value; save(); });
+
+  /* Editor manners: Tab is four spaces, Enter keeps your indent and
+     adds a level after a colon. Python's whitespace is syntax; the
+     editor should not make you count it. */
+  ed.addEventListener("keydown", (e) => {
+    const v = ed.value, a = ed.selectionStart, b = ed.selectionEnd;
+    if (e.key === "Tab") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        const ls = v.lastIndexOf("\n", a - 1) + 1;
+        const cut = v.slice(ls, ls + 4) === "    " ? 4 : (v.slice(ls, ls + 1) === " " ? 1 : 0);
+        if (cut) {
+          ed.value = v.slice(0, ls) + v.slice(ls + cut);
+          ed.selectionStart = ed.selectionEnd = Math.max(ls, a - cut);
+        }
+      } else {
+        ed.value = v.slice(0, a) + "    " + v.slice(b);
+        ed.selectionStart = ed.selectionEnd = a + 4;
+      }
+      ed.dispatchEvent(new Event("input"));
+    } else if (e.key === "Enter" && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault();
+      const ls = v.lastIndexOf("\n", a - 1) + 1;
+      const line = v.slice(ls, a);
+      let pad = (line.match(/^[ \t]*/) || [""])[0];
+      if (/:\s*$/.test(line)) pad += "    ";
+      const ins = "\n" + pad;
+      ed.value = v.slice(0, a) + ins + v.slice(b);
+      ed.selectionStart = ed.selectionEnd = a + ins.length;
+      ed.dispatchEvent(new Event("input"));
+    } else if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault(); doRun();
+    }
+  });
+
+  function outSection(label, inner) {
+    return '<div class="outsec"><div class="outlbl">' + label + "</div>" + inner + "</div>";
+  }
+
+  function paint() {
+    if (!lastRes) return;
+    const r = lastRes;
+    let h = "";
+    const out = r.out || "";
+    h += outSection("output",
+      out === "" ? '<pre class="stream empty">(nothing was printed)</pre>'
+                 : '<pre class="stream">' + esc(out) + "</pre>");
+    if (r.err) h += outSection("error — read the last line first",
+      '<pre class="stream err">' + esc(r.err.replace(/\n+$/, "")) + "</pre>");
+    if (r.names && r.names.length) {
+      h += outSection("names — everything that exists right now",
+        '<table class="vars">' + r.names.map(n =>
+          '<tr><td class="vn">' + esc(n.n) + '</td><td class="vt">' + esc(n.t) +
+          '</td><td class="vv">' + esc(n.v) + "</td></tr>").join("") + "</table>");
+    }
+    if (structOpen) h += outSection("structure — your indentation, drawn out",
+      '<pre class="struct">' + structureHTML(ed.value) + "</pre>");
+    outEl.innerHTML = h;
+    outEl.style.display = "";
+  }
+
+  async function doRun() {
+    const btn = $(".act-run", el);
+    btn.disabled = true; btn.textContent = "running…";
+    const src = ed.value;
+    const res = await runPython(src, inp.value);
+    lastRes = res; paint();
+    btn.disabled = false; btn.textContent = "run";
+
+    let verdict = null;
+    if (block.t === "ex") {
+      verdict = judge(block, res, src);
+      const head = $(".ctag", el);
+      if (verdict.ok) {
+        if (!S.done[key]) S.done[key] = Date.now();
+        head.textContent = "exercise · done"; head.className = "ctag ok";
+        vSlot.innerHTML = '<div class="verdict pass"><span class="vh">That is it.</span>' +
+          "The output matches. Written down in the ledger, with the code you used." + "</div>";
+        renderNav();
+      } else {
+        vSlot.innerHTML = '<div class="verdict fail"><span class="vh">Not yet — and that is ordinary.</span>' +
+          md(verdict.why) + (verdict.detail ? "<pre>" + esc(verdict.detail) + "</pre>" : "") +
+          '<div style="margin-top:8px;font-size:13px;opacity:0.8">Nothing is lost by getting it wrong. ' +
+          "The hint button is above, and so is a worked answer if you would rather read one.</div></div>";
+      }
+    } else { vSlot.innerHTML = ""; }
+
+    S.log.push({
+      ts: Date.now(), key, lesson: lesson.id, title: lesson.title,
+      kind: block.t, src, out: (res.out || "").slice(0, 4000),
+      err: res.err ? res.err.slice(0, 2000) : null,
+      ok: verdict ? verdict.ok : null
+    });
+    if (S.log.length > MAX_LOG) S.log = S.log.slice(-MAX_LOG);
+    save(true);
+  }
+
+  $(".act-run", el).onclick = doRun;
+  $(".act-struct", el).onclick = () => {
+    structOpen = !structOpen;
+    if (!lastRes) lastRes = { out: "", err: null, names: [] };
+    paint();
+  };
+  $(".act-reset", el).onclick = () => {
+    ed.value = block.t === "ex" ? (block.starter || "") : block.src;
+    S.code[key] = ed.value; save(); autosize();
+    outEl.style.display = "none"; vSlot.innerHTML = ""; hSlot.innerHTML = "";
+    lastRes = null; hintLevel = 0;
+  };
+  const hb = $(".act-hint", el);
+  if (hb) hb.onclick = () => {
+    const hints = block.hints || [];
+    if (hintLevel >= hints.length) {
+      hSlot.innerHTML = '<div class="hintbox">That is every hint there is. ' +
+        "<b>show one answer</b> above will write out a version that works — reading it is a legitimate way to learn this, not a shortcut.</div>";
+      return;
+    }
+    hintLevel++;
+    hSlot.innerHTML = '<div class="hintbox">' +
+      hints.slice(0, hintLevel).map((h, i) => "<b>hint " + (i + 1) + ".</b> " + md(h)).join("<br><br>") +
+      "</div>";
+  };
+  const sb = $(".act-sol", el);
+  if (sb) sb.onclick = () => {
+    ed.value = block.solution; S.code[key] = ed.value; save(); autosize();
+    hSlot.innerHTML = '<div class="hintbox">One answer that works, put into the editor. ' +
+      "There are others. Run it, change a piece, run it again and see what breaks — " +
+      "that is worth more than having written it unaided.</div>";
+  };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   VIEWS
+   ══════════════════════════════════════════════════════════════ */
+
+const view = document.getElementById("view");
+
+function go(v, arg) {
+  S.place.view = v;
+  if (v === "lesson") { S.place.lesson = arg; if (!S.seen[arg]) S.seen[arg] = Date.now(); }
+  save(true);
+  render();
+  window.scrollTo(0, 0);
+  $("#rail").classList.remove("open");
+}
+
+function renderNav() {
+  const due = dueCards().length;
+  let h = '<div class="railsec">lessons</div>';
+  LESSONS.forEach((l, i) => {
+    const p = lessonProgress(l);
+    const cls = "navitem" + (S.place.view === "lesson" && S.place.lesson === l.id ? " on" : "") +
+                (p.complete ? " done" : (p.seen ? " started" : ""));
+    h += '<button class="' + cls + '" data-go="lesson" data-arg="' + l.id + '">' +
+         '<span class="num">' + (i + 1) + "</span>" +
+         '<span class="lbl">' + esc(l.title) + "</span>" +
+         '<span class="tick">' + (p.complete ? "✓" : (p.seen ? "·" : "")) + "</span></button>";
+  });
+  h += '<div class="railsec">the rest</div>';
+  h += '<button class="navitem' + (S.place.view === "home" ? " on" : "") + '" data-go="home"><span class="num"></span><span class="lbl">Start / about</span></button>';
+  h += '<button class="navitem' + (S.place.view === "review" ? " on" : "") + '" data-go="review"><span class="num"></span><span class="lbl">Review</span><span class="tick">' + (due ? due : "") + "</span></button>";
+  h += '<button class="navitem' + (S.place.view === "log" ? " on" : "") + '" data-go="log"><span class="num"></span><span class="lbl">The ledger</span></button>';
+  h += '<button class="navitem' + (S.place.view === "notes" ? " on" : "") + '" data-go="notes"><span class="num"></span><span class="lbl">Notes</span></button>';
+  $("#nav").innerHTML = h;
+  $$("#nav .navitem").forEach(b => b.onclick = () => go(b.dataset.go, b.dataset.arg));
+}
+
+/* ── home ──────────────────────────────────────────────────── */
+function viewHome() {
+  const last = S.log.length ? S.log[S.log.length - 1] : null;
+  const seenCount = Object.keys(S.seen).length;
+  const doneCount = Object.keys(S.done).length;
+  const totalEx = LESSONS.reduce((n, l) => n + exercisesOf(l).length, 0);
+  const due = dueCards().length;
+
+  let resume = "";
+  if (last) {
+    const l = lessonById(last.lesson);
+    resume =
+      '<div id="resume"><span class="tag">where you left off</span>' +
+      "You last ran something " + esc(when(last.ts)) + ", in <strong>" +
+      esc(l ? l.title : last.lesson) + "</strong>" +
+      (last.ok === true ? " — and it passed." : last.ok === false ? " — it had not passed yet." : ".") +
+      "<br>This is what you had written:" +
+      '<pre style="font-family:var(--mono);font-size:12.5px;white-space:pre-wrap;margin:9px 0 0;color:var(--dim);' +
+      'border-left:1px solid var(--edge);padding-left:11px">' + esc(last.src.slice(0, 500)) + "</pre>" +
+      '<div class="actions">' +
+      (l ? '<button class="btn" data-go="lesson" data-arg="' + l.id + '">back to ' + esc(l.title) + "</button>" : "") +
+      '<button class="btn ghost" data-go="log">open the whole ledger</button></div></div>';
+  } else {
+    resume = '<div id="resume"><span class="tag">nothing recorded yet</span>' +
+      "You have not run anything on this page before — or this is a different browser, or the storage was cleared. " +
+      "Either way, start at <strong>Saying things out loud</strong> and nothing is required of you beforehand." +
+      '<div class="actions"><button class="btn" data-go="lesson" data-arg="print">start at the first lesson</button></div></div>';
+  }
+
+  return resume +
+  '<div class="kicker">the ledger</div>' +
+  '<h2 class="lesson-title">Python from the beginning, built for a mind that does not picture things and does not re-live them</h2>' +
+  '<p class="body">Most programming tutorials quietly assume two faculties. A mind\'s eye — <em>picture a box holding a value, visualise the call stack</em>. And a re-livable past — <em>remember when we covered loops last week</em>. With aphantasia the first is empty. With SDAM the second is empty. Neither has anything to do with whether you can learn Python: the semantic memory that holds rules, structure and language is a different system, and it is intact.</p>' +
+  '<p class="body">So the scaffolding is what changes here, not the material. This is ordinary Python — real CPython, compiled to WebAssembly, running in this tab. Sixteen lessons, from <code class="inl">print</code> to writing a class of your own. What is different is everything around it.</p>' +
+
+  '<div class="box rule"><span class="tag">instead of imagining, reading</span>' +
+  "<p>Nothing in this file asks you to picture, visualise or imagine anything. Every claim is a rule stated in words. " +
+  "And everything that would have been a mental image is put on the screen instead: after every single run you get " +
+  "<strong>the names table</strong> — every name that exists, what it is attached to, and what kind of thing that is, " +
+  "read straight out of Python — and <strong>the structure readout</strong>, which redraws your own indentation with the " +
+  "block nesting marked and flags any line that does not line up. External, not internal. You are not remembering the " +
+  "state of the program; you are looking at it.</p></div>" +
+
+  '<div class="box rule"><span class="tag">instead of remembering, the ledger</span>' +
+  "<p>Every run you make is written down — the time, the lesson, the exact code, the output, whether it passed — and kept. " +
+  "No lesson ever says <em>as we saw earlier</em>. Each one restates its prerequisites in full, so you can open lesson nine " +
+  "cold, on a Tuesday, having no sense at all of having done lessons one to eight, and not be missing a rule. " +
+  "The page opens on <em>where you left off</em>, with the actual code you last wrote, because reconstructing that from " +
+  "the inside is precisely the thing that does not work.</p></div>" +
+
+  '<div class="box rule"><span class="tag">no arithmetic anywhere</span>' +
+  "<p>No FizzBuzz, no fibonacci, no times tables, no factorials, no counting exercises. The examples are birds, trees, " +
+  "words and tools. Numbers appear only where Python itself needs them — a length, an index — they stay small, and the " +
+  "page always shows the result. Nothing here is secretly a maths test.</p></div>" +
+
+  '<div class="box rule"><span class="tag">no pressure mechanics</span>' +
+  "<p>No streaks, no timers, no scores going down, no penalties, no confetti. Nothing is locked: every lesson is open " +
+  "from the start and you may read them in any order. Each states its length up front. Getting an exercise wrong logs it " +
+  "and says so plainly; there is a hint ladder and a worked answer on every one, and reading the answer is a legitimate " +
+  "way to learn something, not a shortcut you are being watched for. You may leave in the middle of anything — the editor " +
+  "keeps what you typed.</p></div>" +
+
+  '<hr class="sep">' +
+  '<div class="kicker">so far</div>' +
+  '<div class="stat">' +
+    "<div><span>" + seenCount + " of " + LESSONS.length + "</span><small>lessons opened</small></div>" +
+    "<div><span>" + doneCount + " of " + totalEx + "</span><small>exercises passed</small></div>" +
+    "<div><span>" + S.log.length + "</span><small>runs recorded</small></div>" +
+    "<div><span>" + due + "</span><small>cards due</small></div>" +
+  "</div>" +
+
+  '<div class="box note"><span class="tag">how to use it, if a suggestion helps</span>' +
+  "<p>One lesson at a sitting is plenty. Run every example before reading past it — the examples are meant to be " +
+  "modified and re-run, not admired. When something does not land, the fastest move is nearly always to print the thing " +
+  "and look at it rather than to reason about it.</p>" +
+  "<p>Come back to <strong>Review</strong> when you feel like it. It holds only the semantic residue — the rules, not the " +
+  "occasions — and only from lessons you have actually opened. Two buttons, no grading.</p></div>" +
+
+  '<hr class="sep">' +
+  '<div class="kicker">keeping it</div>' +
+  '<p class="body">All of this lives in this browser\'s local storage, for this file, on this machine. It survives ' +
+  "reloads and closing the tab. It does <strong>not</strong> survive clearing site data, a different browser, or a " +
+  "different machine — so if any of this matters to you, export it. The file it gives you is plain JSON: your progress, " +
+  "your code, your notes, your whole ledger.</p>" +
+  '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:14px">' +
+    '<button class="btn" id="doExport">export everything</button>' +
+    '<button class="btn" id="doImport">import a file</button>' +
+    '<button class="btn ghost" id="doWipe">erase everything</button>' +
+  "</div>" +
+  '<input type="file" id="fileIn" accept="application/json,.json" style="display:none">' +
+  '<p class="body" style="font-size:13px;color:var(--dim);margin-top:26px">Python is downloaded from a CDN the first ' +
+  "time you press Run, then cached by the browser. Everything else — the lessons, your code, the ledger, the notes, " +
+  "the review — works with no connection at all.</p>";
+}
+
+/* ── a lesson ──────────────────────────────────────────────── */
+function viewLesson(id) {
+  const l = lessonById(id);
+  if (!l) return viewHome();
+  const i = lessonIndex(id);
+  const p = lessonProgress(l);
+
+  let h = '<div class="kicker">lesson ' + (i + 1) + " of " + LESSONS.length + "</div>";
+  h += '<h2 class="lesson-title">' + esc(l.title) + "</h2>";
+  h += '<div class="meta">About ' + l.minutes + " minutes" +
+       (p.total ? " · " + p.total + " exercise" + (p.total === 1 ? "" : "s") +
+                  (p.done ? " · " + p.done + " passed" : "") : "") +
+       (S.seen[id] ? " · first opened " + esc(when(S.seen[id])) : "") + "</div>";
+  h += '<div class="box note" style="margin-top:22px"><span class="tag">why this exists</span><p>' + md(l.why) + "</p></div>";
+
+  if (l.known && l.known.length) {
+    h += '<div class="box known"><span class="tag">what this lesson stands on — stated in full, not referred back to</span><ul>' +
+         l.known.map(k => "<li>" + md(k) + "</li>").join("") + "</ul></div>";
+  }
+
+  l.blocks.forEach((b, idx) => {
+    if (b.t === "p")    h += '<p class="body">' + md(b.x) + "</p>";
+    else if (b.t === "rule") h += '<div class="box rule"><span class="tag">rule</span><p>' + md(b.x) + "</p></div>";
+    else if (b.t === "warn") h += '<div class="box warn"><span class="tag">watch out</span><p>' + md(b.x) + "</p></div>";
+    else if (b.t === "note") h += '<div class="box note"><span class="tag">note</span><p>' + md(b.x) + "</p></div>";
+    else if (b.t === "table") {
+      h += '<table class="grid"><thead><tr>' + b.head.map(x => "<th>" + esc(x) + "</th>").join("") +
+           "</tr></thead><tbody>" +
+           b.rows.map(r => "<tr>" + r.map((c, ci) => "<td>" + (ci === 0 ? esc(c) : md(c)) + "</td>").join("") + "</tr>").join("") +
+           "</tbody></table>";
+    }
+    else if (b.t === "code" || b.t === "ex") h += cellHTML(l, b, idx);
+  });
+
+  if (l.cards && l.cards.length) {
+    h += '<hr class="sep"><div class="kicker">what this lesson leaves behind</div>' +
+      '<p class="body" style="color:var(--dim);font-size:14px">These go into Review. They are rules, not occasions — ' +
+      "the kind of thing that stays whether or not you can recall having read it.</p><ul class='plain'>" +
+      l.cards.map(c => "<li>" + md(c.q) + "</li>").join("") + "</ul>";
+  }
+
+  h += '<hr class="sep"><div style="display:flex;gap:9px;flex-wrap:wrap">';
+  if (i > 0) h += '<button class="btn" data-go="lesson" data-arg="' + LESSONS[i-1].id + '">← ' + esc(LESSONS[i-1].title) + "</button>";
+  if (i < LESSONS.length - 1) h += '<button class="btn" data-go="lesson" data-arg="' + LESSONS[i+1].id + '">' + esc(LESSONS[i+1].title) + " →</button>";
+  h += '<span class="spacer"></span><button class="btn ghost" data-go="review">review</button></div>';
+  return h;
+}
+
+/* ── review ────────────────────────────────────────────────── */
+let reviewQueue = null, reviewShown = false;
+
+function viewReview() {
+  const seenAny = Object.keys(S.seen).length > 0;
+  if (!seenAny) {
+    return '<div class="kicker">review</div><h2 class="lesson-title">Nothing to review yet</h2>' +
+      '<p class="body">Review only ever holds cards from lessons you have actually opened — there is no point ' +
+      'testing you on something you have not met. Open a lesson and come back.</p>' +
+      '<button class="btn" data-go="lesson" data-arg="print">start at the first lesson</button>';
+  }
+  if (reviewQueue === null) reviewQueue = dueCards();
+  if (!reviewQueue.length) {
+    const all = allCards();
+    const next = all.map(c => cardState(c.key).due).filter(d => d > Date.now()).sort((a, b) => a - b)[0];
+    return '<div class="kicker">review</div><h2 class="lesson-title">Nothing is due</h2>' +
+      '<p class="body">Every card you have met has been seen recently enough. ' +
+      (next ? "The next one comes back around " + esc(when(next).replace(" ago", "")) + " from now — " +
+              "roughly " + Math.max(1, Math.round((next - Date.now()) / DAY)) + " day" +
+              (Math.round((next - Date.now()) / DAY) === 1 ? "" : "s") + "."
+            : "") + "</p>" +
+      '<p class="body" style="color:var(--dim)">There is nothing to be gained by drilling something you already have. ' +
+      'You can go through them all anyway if you would rather.</p>' +
+      '<div style="display:flex;gap:9px;flex-wrap:wrap"><button class="btn" id="reviewAll">go through all of them anyway</button>' +
+      '<button class="btn ghost" data-go="home">back to the start</button></div>';
+  }
+  const c = reviewQueue[0];
+  const st = cardState(c.key);
+  return '<div class="kicker">review · ' + reviewQueue.length + " to go</div>" +
+    '<div class="card"><div class="src">' + esc(c.lesson.title) + "</div>" +
+    '<div class="q">' + md(c.q) + "</div>" +
+    (reviewShown ? '<div class="a">' + md(c.a) + "</div>" : "") +
+    '<div class="cardbar">' +
+      (reviewShown
+        ? '<button class="btn run" id="knew">I had that</button>' +
+          '<button class="btn" id="didnt">I did not</button>'
+        : '<button class="btn run" id="show">show the answer</button>' +
+          '<button class="btn ghost" id="skip">skip this one</button>') +
+    "</div></div>" +
+    (st.right || st.wrong
+      ? '<p class="body" style="font-size:13px;color:var(--dimmer)">You have had this one right ' + st.right +
+        " time" + (st.right === 1 ? "" : "s") + " and not-yet " + st.wrong + " time" + (st.wrong === 1 ? "" : "s") +
+        ". Neither number does anything except sit there.</p>"
+      : "") +
+    '<p class="body" style="font-size:13px;color:var(--dimmer)">Saying you did not have it is not a penalty. ' +
+    "It puts the card back in the near queue, which is the entire mechanism. Guessing that you knew it is the only " +
+    "way to make this worse.</p>";
+}
+
+/* ── the ledger ────────────────────────────────────────────── */
+function viewLog() {
+  if (!S.log.length) {
+    return '<div class="kicker">the ledger</div><h2 class="lesson-title">Nothing written down yet</h2>' +
+      '<p class="body">Every time you press Run, this page writes down the moment, the lesson, the code exactly as you ' +
+      'had it, what came out, and whether it passed. It keeps the last ' + MAX_LOG + ' of them.</p>' +
+      '<p class="body">The purpose is not statistics. It is that "did I do this, and what did I write" should be a ' +
+      'question you answer by <em>looking</em>, not by trying to recall an occasion.</p>' +
+      '<button class="btn" data-go="lesson" data-arg="print">start at the first lesson</button>';
+  }
+  const rows = S.log.slice().reverse();
+  let h = '<div class="kicker">the ledger</div><h2 class="lesson-title">Everything you have run here</h2>' +
+    '<p class="body">Newest first. Click any line to open the code and the output exactly as they were. ' +
+    "Nothing here is a score — it is a record, kept so that you never have to reconstruct one.</p>" +
+    '<div class="meta">' + rows.length + " run" + (rows.length === 1 ? "" : "s") + " kept · oldest is " +
+    esc(when(rows[rows.length - 1].ts)) + "</div><div style='margin-top:20px'>";
+  rows.forEach((e, i) => {
+    h += '<div class="entry"><div class="entryhead" data-toggle="' + i + '">' +
+      '<span class="when">' + esc(when(e.ts)) + "</span>" +
+      '<span class="where">' + esc(e.title || e.lesson) + "</span>" +
+      '<span class="flag ' + (e.ok === true ? "ok" : e.ok === false ? "no" : "") + '">' +
+      (e.ok === true ? "passed" : e.ok === false ? "not yet" : (e.err ? "error" : "ran")) + "</span></div>" +
+      '<div class="entrybody" id="body' + i + '" style="display:none"><pre>' + esc(e.src) + "</pre>" +
+      '<pre class="o">' + esc(e.err ? e.err : (e.out || "(nothing was printed)")) + "</pre></div></div>";
+  });
+  h += "</div><hr class='sep'><button class='btn ghost' id='clearLog'>erase the ledger, keep everything else</button>";
+  return h;
+}
+
+/* ── notes ─────────────────────────────────────────────────── */
+function viewNotes() {
+  return '<div class="kicker">notes</div><h2 class="lesson-title">Your own words</h2>' +
+    '<p class="body">Saved as you type, in the same place as everything else, and included in the export. ' +
+    "Write in here the way you would write a comment: not what a thing does, but what you meant by it, and what " +
+    "confused you before it stopped confusing you. A note written the first time round is worth a great deal more " +
+    "than the same note reconstructed later.</p>" +
+    '<textarea class="notes" id="notepad" spellcheck="true" placeholder="anything at all">' + esc(S.notes) + "</textarea>";
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ROUTER
+   ══════════════════════════════════════════════════════════════ */
+
+function render() {
+  const v = S.place.view;
+  if (v === "lesson") view.innerHTML = viewLesson(S.place.lesson);
+  else if (v === "review") view.innerHTML = viewReview();
+  else if (v === "log") view.innerHTML = viewLog();
+  else if (v === "notes") view.innerHTML = viewNotes();
+  else view.innerHTML = viewHome();
+
+  renderNav();
+  $$("[data-go]", view).forEach(b => b.onclick = () => go(b.dataset.go, b.dataset.arg));
+  $$(".cell", view).forEach(wireCell);
+
+  /* review buttons */
+  const show = $("#show", view);
+  if (show) show.onclick = () => { reviewShown = true; render(); };
+  const skip = $("#skip", view);
+  if (skip) skip.onclick = () => { reviewQueue.push(reviewQueue.shift()); reviewShown = false; render(); };
+  const knew = $("#knew", view);
+  if (knew) knew.onclick = () => { gradeCard(reviewQueue[0].key, true); reviewQueue.shift(); reviewShown = false; render(); };
+  const didnt = $("#didnt", view);
+  if (didnt) didnt.onclick = () => {
+    const c = reviewQueue.shift(); gradeCard(c.key, false);
+    reviewQueue.push(c); reviewShown = false; render();
+  };
+  const all = $("#reviewAll", view);
+  if (all) all.onclick = () => { reviewQueue = allCards(); reviewShown = false; render(); };
+
+  /* ledger */
+  $$("[data-toggle]", view).forEach(hd => hd.onclick = () => {
+    const b = $("#body" + hd.dataset.toggle, view);
+    b.style.display = b.style.display === "none" ? "" : "none";
+  });
+  const cl = $("#clearLog", view);
+  if (cl) cl.onclick = () => {
+    if (confirm("Erase the record of every run? Your progress, code, notes and review schedule are all kept — only the log goes.")) {
+      S.log = []; save(true); render();
+    }
+  };
+
+  /* notes */
+  const pad = $("#notepad", view);
+  if (pad) pad.oninput = () => { S.notes = pad.value; save(); };
+
+  /* export / import / wipe */
+  const ex = $("#doExport", view);
+  if (ex) ex.onclick = () => {
+    const blob = new Blob([JSON.stringify(S, null, 2)], { type: "application/json" });
+    const a = document.createElement("a");
+    const d = new Date();
+    a.href = URL.createObjectURL(blob);
+    a.download = "ledger-python-" + d.getFullYear() + "-" +
+      String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0") + ".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+  const im = $("#doImport", view);
+  if (im) im.onclick = () => $("#fileIn", view).click();
+  const fi = $("#fileIn", view);
+  if (fi) fi.onchange = () => {
+    const f = fi.files && fi.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => {
+      try {
+        const data = JSON.parse(r.result);
+        if (!data || typeof data !== "object" || !("log" in data && "code" in data))
+          throw new Error("that does not look like a ledger export");
+        if (!confirm("Replace everything currently saved in this browser with the contents of that file?")) return;
+        S = Object.assign(blank(), data);
+        reviewQueue = null; save(true); go("home");
+      } catch (e) { alert("Could not read that file: " + e.message); }
+    };
+    r.readAsText(f);
+  };
+  const wipe = $("#doWipe", view);
+  if (wipe) wipe.onclick = () => {
+    if (!confirm("Erase all progress, code, notes, review schedule and the whole ledger? This cannot be undone.")) return;
+    if (!confirm("Really? Export first if there is any chance you want it back.")) return;
+    S = blank(); reviewQueue = null; save(true); go("home");
+  };
+}
+
+$("#railtoggle").onclick = () => $("#rail").classList.toggle("open");
+
+/* Always land on the start page rather than teleporting back into the
+   middle of a lesson. Re-orientation should be explicit and one click
+   long, not something you are expected to do from the inside. */
+S.place.view = "home";
+render();
+bootPython();
+</script>
+</body>
+</html>

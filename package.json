@@ -1,0 +1,13 @@
+{
+  "name": "outboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tools that keep things outside your head.",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
