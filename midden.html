@@ -1,0 +1,1921 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Midden — reading a corpus from its discard pile</title>
+<style>
+/* ───────────────────────────────────────────────────────────
+   THE MIDDEN
+
+   A midden is a refuse heap. Archaeologists read whole
+   civilisations out of them — not from the monuments, which
+   were built to be read, but from the shells and bones and
+   broken pots nobody meant to leave behind.
+
+   An export file is a midden. Nobody writes a year of chats
+   as a document. The themes in it were never declared; they
+   accumulated. So this doesn't summarise. It counts, weighs,
+   and lays the strata out so the shape shows.
+
+   Everything here happens in your browser. No network calls,
+   no API key, no upload. Read the source — there is not a
+   single fetch() in it.
+   ─────────────────────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:      #0d0f12;
+  --panel:   #111419;
+  --ink:     #c8ccd2;
+  --dim:     #5a6068;
+  --dimmer:  #3a4048;
+  --line:    #1d2127;
+  --line-lit:#2a3038;
+  --accent:  #8fb3c8;
+  --warm:    #c89a8f;
+
+  /* sequential ramp — one hue, monotone lightness, validated
+     against this surface. Near-zero recedes into the page. */
+  --s1: #151c24;
+  --s2: #1c2c3a;
+  --s3: #243d52;
+  --s4: #2e516e;
+  --s5: #43708f;
+  --s6: #6693b0;
+  --s7: #94bcd6;
+}
+
+html, body { height: 100%; }
+
+body {
+  font-family: 'SFMono-Regular', 'JetBrains Mono', ui-monospace, 'Courier New', monospace;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-y: scroll;
+}
+
+a { color: var(--accent); }
+
+/* ── drop / landing ─────────────────────────────────────── */
+
+#landing {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  gap: 26px;
+  text-align: center;
+}
+
+#landing h1 {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+#landing .sub {
+  font-size: 11px;
+  color: var(--dim);
+  max-width: 460px;
+  line-height: 1.8;
+}
+
+#drop {
+  width: min(560px, 100%);
+  border: 1px dashed var(--line-lit);
+  padding: 44px 24px;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+#drop:hover, #drop.hot { border-color: var(--accent); background: #10161c; }
+#drop .big { font-size: 12px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent); }
+#drop .small { margin-top: 12px; font-size: 11px; color: var(--dim); line-height: 1.9; }
+
+#formats {
+  width: min(560px, 100%);
+  text-align: left;
+  font-size: 11px;
+  color: var(--dim);
+  line-height: 1.9;
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+#formats b { color: var(--ink); font-weight: 400; }
+#formats code { color: var(--warm); }
+#formats dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; margin-top: 8px; }
+#formats dt { color: var(--ink); white-space: nowrap; }
+#formats dd { color: var(--dim); }
+
+.privacy { font-size: 11px; color: var(--dim); max-width: 460px; line-height: 1.8; }
+
+/* ── app chrome ─────────────────────────────────────────── */
+
+#app { display: none; max-width: 1180px; margin: 0 auto; padding: 0 20px 90px; }
+#app.on { display: block; }
+
+#bar {
+  position: sticky; top: 0; z-index: 40;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; gap: 18px;
+  padding: 14px 0 12px;
+  flex-wrap: wrap;
+}
+#bar .brand { font-size: 11px; letter-spacing: 0.34em; text-transform: uppercase; color: var(--dim); }
+#bar nav { display: flex; gap: 2px; flex-wrap: wrap; }
+#bar nav button {
+  background: none; border: 1px solid transparent; color: var(--dim);
+  font: inherit; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase;
+  padding: 5px 11px; cursor: pointer;
+}
+#bar nav button:hover { color: var(--ink); }
+#bar nav button.on { color: var(--accent); border-color: var(--line-lit); }
+#bar .spacer { flex: 1 1 auto; }
+#bar .corpusname { font-size: 11px; color: var(--dimmer); }
+
+.view { display: none; padding-top: 30px; }
+.view.on { display: block; }
+
+h2 {
+  font-size: 11px; font-weight: 400; letter-spacing: 0.3em;
+  text-transform: uppercase; color: var(--dim);
+  margin: 40px 0 4px;
+}
+.view > h2:first-child { margin-top: 0; }
+.caption { font-size: 11px; color: var(--dimmer); line-height: 1.8; margin-bottom: 18px; max-width: 620px; }
+.caption em { color: var(--dim); font-style: normal; }
+
+/* ── stat tiles ─────────────────────────────────────────── */
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.tile { padding: 16px 16px 14px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.tile .n { font-size: 21px; color: var(--ink); line-height: 1.25; letter-spacing: -0.01em; }
+.tile .n small { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; }
+.tile .k { font-size: 10px; color: var(--dim); letter-spacing: 0.18em; text-transform: uppercase; margin-top: 7px; }
+
+/* ── bars ───────────────────────────────────────────────── */
+
+.bars { display: grid; gap: 5px; }
+.bars .row { display: grid; grid-template-columns: minmax(80px, 148px) 1fr auto; gap: 12px; align-items: center; }
+.bars .lab { font-size: 11px; color: var(--ink); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bars .track { height: 11px; position: relative; }
+.bars .fill { height: 100%; background: var(--accent); border-radius: 0 3px 3px 0; min-width: 1px; }
+.bars .val { font-size: 11px; color: var(--dim); font-variant-numeric: tabular-nums; min-width: 42px; }
+.bars .row:hover .lab { color: var(--accent); }
+
+/* columns (time volume, hour of day) */
+.cols { display: flex; align-items: flex-end; gap: 2px; height: 108px; border-bottom: 1px solid var(--line); }
+.cols .col { flex: 1 1 0; position: relative; min-width: 3px; display: flex; align-items: flex-end; height: 100%; }
+.cols .col i { display: block; width: 100%; max-width: 44px; margin: 0 auto; background: var(--accent); border-radius: 4px 4px 0 0; min-height: 1px; }
+.cols .col:hover i { background: var(--s7); }
+.colaxis { display: flex; gap: 2px; margin-top: 7px; }
+.colaxis span { flex: 1 1 0; min-width: 3px; font-size: 9px; color: var(--dimmer); text-align: center; overflow: hidden; white-space: nowrap; }
+
+/* ── heatmap ────────────────────────────────────────────── */
+
+#driftwrap { overflow-x: auto; padding-bottom: 6px; }
+.heat { border-collapse: separate; border-spacing: 2px; font-size: 11px; }
+.heat th { font-weight: 400; color: var(--dim); font-size: 10px; padding: 0 4px; }
+.heat th.rowlab { text-align: right; color: var(--ink); white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.heat th.collab { writing-mode: vertical-rl; transform: rotate(180deg); height: 58px; letter-spacing: 0.08em; }
+.heat td { width: 22px; height: 18px; border-radius: 2px; cursor: default; }
+.heat td:hover { outline: 1px solid var(--accent); outline-offset: -1px; }
+.ramp { display: flex; align-items: center; gap: 8px; margin-top: 16px; font-size: 10px; color: var(--dimmer); letter-spacing: 0.1em; }
+.ramp i { display: block; width: 22px; height: 9px; border-radius: 2px; }
+
+/* ── the map ────────────────────────────────────────────── */
+
+#mapwrap { position: relative; border: 1px solid var(--line); background: var(--panel); }
+#map { display: block; width: 100%; height: 520px; }
+#mapnote { position: absolute; left: 12px; bottom: 10px; font-size: 10px; color: var(--dimmer); letter-spacing: 0.08em; pointer-events: none; }
+
+/* ── clusters ───────────────────────────────────────────── */
+
+.clusters { display: grid; grid-template-columns: repeat(auto-fit, minmax(258px, 1fr)); border-top: 1px solid var(--line); border-left: 1px solid var(--line); }
+.cl { padding: 15px 16px 16px; cursor: pointer; transition: background .12s; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.cl:hover, .cl.on { background: var(--panel); }
+.cl.on { box-shadow: inset 2px 0 0 var(--accent); }
+.cl .terms { font-size: 12px; color: var(--ink); line-height: 1.7; }
+.cl .terms b { font-weight: 400; color: var(--accent); }
+.cl .meta { font-size: 10px; color: var(--dim); letter-spacing: 0.14em; text-transform: uppercase; margin-top: 9px; }
+.cl .ex { font-size: 11px; color: var(--dimmer); margin-top: 9px; line-height: 1.7; }
+.cl .ex span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── hand-off to a bro ──────────────────────────────────── */
+
+.handoff { border: 1px solid var(--line); padding: 20px 22px 22px; }
+.handoff .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+.btn {
+  background: none; border: 1px solid var(--line-lit); color: var(--accent);
+  font: inherit; font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+  padding: 8px 14px; cursor: pointer; transition: border-color .12s, color .12s;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:disabled { color: var(--dimmer); border-color: var(--line); cursor: default; }
+.btn.done { color: var(--warm); border-color: var(--warm); }
+.handoff textarea {
+  width: 100%; margin-top: 14px; min-height: 92px; resize: vertical;
+  background: var(--panel); border: 1px solid var(--line-lit); color: var(--ink);
+  font: inherit; font-size: 11px; padding: 10px 12px; line-height: 1.7;
+}
+.handoff details { margin-top: 16px; }
+.handoff summary { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); cursor: pointer; }
+.handoff summary:hover { color: var(--accent); }
+.handoff pre {
+  margin-top: 10px; max-height: 260px; overflow: auto; font-size: 11px; line-height: 1.6;
+  color: var(--dim); background: var(--panel); border: 1px solid var(--line); padding: 12px;
+  white-space: pre-wrap; word-break: break-word;
+}
+.handoff .note { font-size: 11px; color: var(--dim); margin-top: 12px; line-height: 1.8; }
+.handoff .note.bad { color: var(--warm); }
+.cl .named { font-size: 13px; color: var(--ink); line-height: 1.6; margin-bottom: 5px; }
+.cl .named em { color: var(--warm); font-style: normal; }
+.cl .note { font-size: 11px; color: var(--dim); line-height: 1.7; margin-top: 6px; }
+
+/* ── controls ───────────────────────────────────────────── */
+
+.ctl { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; padding: 12px 0 20px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+.ctl label { font-size: 10px; color: var(--dim); letter-spacing: 0.16em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.ctl select, .ctl input[type=text], .ctl input[type=search] {
+  background: var(--panel); border: 1px solid var(--line-lit); color: var(--ink);
+  font: inherit; font-size: 11px; padding: 5px 8px; letter-spacing: 0;
+  text-transform: none;
+}
+.ctl input[type=range] { width: 108px; accent-color: var(--accent); }
+.ctl input[type=checkbox] { accent-color: var(--accent); }
+.ctl .num { color: var(--accent); font-variant-numeric: tabular-nums; min-width: 18px; }
+.ctl .seg { display: flex; border: 1px solid var(--line-lit); }
+.ctl .seg button {
+  background: none; border: none; border-right: 1px solid var(--line-lit);
+  color: var(--dim); font: inherit; font-size: 10px; letter-spacing: 0.14em;
+  text-transform: uppercase; padding: 5px 10px; cursor: pointer;
+}
+.ctl .seg button:last-child { border-right: none; }
+.ctl .seg button.on { color: var(--accent); background: var(--panel); }
+
+/* ── reader ─────────────────────────────────────────────── */
+
+#readsplit { display: grid; grid-template-columns: minmax(230px, 310px) 1fr; gap: 26px; align-items: start; }
+#convlist { border-right: 1px solid var(--line); padding-right: 20px; max-height: 76vh; overflow-y: auto; }
+#convlist .item { padding: 8px 9px; cursor: pointer; border-left: 2px solid transparent; }
+#convlist .item:hover { background: var(--panel); }
+#convlist .item.on { background: var(--panel); border-left-color: var(--accent); }
+#convlist .item .t { font-size: 11px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#convlist .item.on .t { color: var(--accent); }
+#convlist .item .m { font-size: 10px; color: var(--dimmer); letter-spacing: 0.1em; margin-top: 2px; }
+#convlist .more { font-size: 10px; color: var(--dim); padding: 10px 9px; cursor: pointer; letter-spacing: 0.14em; text-transform: uppercase; }
+#convlist .more:hover { color: var(--accent); }
+
+#transcript { max-height: 76vh; overflow-y: auto; padding-right: 6px; }
+#transcript .th { border-bottom: 1px solid var(--line); padding-bottom: 12px; margin-bottom: 18px; }
+#transcript .th h3 { font-size: 13px; font-weight: 400; color: var(--ink); line-height: 1.5; }
+#transcript .th .m { font-size: 10px; color: var(--dim); letter-spacing: 0.14em; text-transform: uppercase; margin-top: 6px; }
+.msg { margin-bottom: 22px; }
+.msg .who { font-size: 10px; letter-spacing: 0.24em; text-transform: uppercase; color: var(--dim); margin-bottom: 6px; }
+.msg.human .who { color: var(--warm); }
+.msg.assistant .who { color: var(--accent); }
+.msg .body { white-space: pre-wrap; word-wrap: break-word; overflow-wrap: anywhere; font-size: 12px; line-height: 1.75; color: var(--ink); }
+.msg .body mark { background: #2e516e; color: #e6edf3; }
+.msg.human .body { color: #b9bec6; }
+.msg .think { margin-top: 8px; border-left: 1px solid var(--line-lit); padding-left: 12px; }
+.msg .think summary { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--dimmer); cursor: pointer; }
+.msg .think .body { color: var(--dim); font-size: 11px; margin-top: 6px; }
+
+/* ── misc ───────────────────────────────────────────────── */
+
+#tip {
+  position: fixed; z-index: 90; pointer-events: none; opacity: 0;
+  background: #05070a; border: 1px solid var(--line-lit);
+  padding: 7px 10px; font-size: 11px; color: var(--ink);
+  max-width: 280px; line-height: 1.6; transition: opacity .1s;
+}
+#tip b { font-weight: 400; color: var(--accent); }
+#tip.on { opacity: 1; }
+
+#status { font-size: 11px; color: var(--dim); letter-spacing: 0.1em; }
+.err { color: var(--warm); font-size: 11px; line-height: 1.8; max-width: 520px; white-space: pre-wrap; text-align: left; }
+.empty { color: var(--dimmer); font-size: 11px; padding: 20px 0; }
+
+.tablelink { font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); cursor: pointer; background: none; border: none; font-family: inherit; padding: 10px 0 0; }
+.tablelink:hover { color: var(--accent); }
+table.data { border-collapse: collapse; font-size: 11px; margin-top: 12px; width: 100%; }
+table.data th, table.data td { border: 1px solid var(--line); padding: 4px 9px; text-align: left; }
+table.data th { color: var(--dim); font-weight: 400; letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px; }
+table.data td { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+@media (max-width: 720px) {
+  #readsplit { grid-template-columns: 1fr; }
+  #convlist { border-right: none; border-bottom: 1px solid var(--line); padding-right: 0; max-height: 300px; }
+  #transcript { max-height: none; }
+}
+</style>
+</head>
+<body>
+
+<div id="landing">
+  <h1>The Midden</h1>
+  <p class="sub">A refuse heap, read as a record. Drop an export in and it counts what
+  accumulated — the words that keep coming back, when they arrived, and which
+  conversations turn out to be the same conversation.</p>
+
+  <button id="drop" type="button">
+    <div class="big">drop an export here</div>
+    <div class="small">or click to choose — .zip · .json · .jsonl · a folder<br>
+    nothing is uploaded; the file is read in this tab and stays there</div>
+  </button>
+
+  <div id="status"></div>
+  <div id="err" class="err"></div>
+
+  <div id="formats">
+    <b>What it eats</b>
+    <dl>
+      <dt>claude.ai</dt><dd>Settings → Privacy → Export data. Mail arrives with a <code>.zip</code>; drop the zip whole, or the <code>conversations.json</code> inside it.</dd>
+      <dt>Claude Code</dt><dd><code>~/.claude/projects/&lt;slug&gt;/*.jsonl</code> — drop one file, many, or the folder.</dd>
+      <dt>ChatGPT</dt><dd><code>conversations.json</code> from its export zip.</dd>
+      <dt>Raw</dt><dd>Any JSON array of <code>{role, content}</code> messages.</dd>
+    </dl>
+  </div>
+
+  <p class="privacy">This page makes no network requests of any kind. There is no API key
+  because there is no API: the themes are computed from word statistics, right here,
+  in about a second. That has limits, and the Themes panel says what they are.</p>
+</div>
+
+<div id="app">
+  <div id="bar">
+    <span class="brand">The Midden</span>
+    <nav>
+      <button data-v="corpus" class="on">Corpus</button>
+      <button data-v="themes">Themes</button>
+      <button data-v="map">Map</button>
+      <button data-v="drift">Drift</button>
+      <button data-v="read">Read</button>
+    </nav>
+    <span class="spacer"></span>
+    <span class="corpusname" id="corpusname"></span>
+  </div>
+
+  <section class="view on" id="v-corpus"></section>
+  <section class="view" id="v-themes"></section>
+  <section class="view" id="v-map"></section>
+  <section class="view" id="v-drift"></section>
+  <section class="view" id="v-read"></section>
+</div>
+
+<div id="tip"></div>
+
+<input type="file" id="picker" multiple accept=".json,.jsonl,.zip,application/json,application/zip" style="display:none">
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════
+   1 · INGEST
+   Export formats drift. Rather than assert one shape, sniff
+   for the handful that show up and fall back loudly.
+   ═══════════════════════════════════════════════════════════ */
+
+const $  = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+
+const state = {
+  convs: [],          /* normalised corpus */
+  index: null,        /* tf-idf index */
+  clusters: null,
+  sourceLabel: "",
+  warnings: [],
+  opts: { scope: "both", code: false, think: false, k: 0, extraStop: "" },
+  sel: { cluster: -1, conv: -1 },
+  names: new Map(),   /* cluster fingerprint -> {name, note} from a bro */
+};
+
+/* ── zip, via the platform's own inflate ─────────────────── */
+
+async function inflateRaw(bytes) {
+  if (typeof DecompressionStream === "undefined")
+    throw new Error("This browser can't unzip. Unzip the export yourself and drop conversations.json.");
+  const s = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Uint8Array(await new Response(s).arrayBuffer());
+}
+
+async function readZip(buf) {
+  const dv = new DataView(buf), u8 = new Uint8Array(buf), dec = new TextDecoder();
+  let eocd = -1;
+  const floor = Math.max(0, buf.byteLength - 66000);
+  for (let i = buf.byteLength - 22; i >= floor; i--) {
+    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("Not a readable zip (no end-of-directory record).");
+  const count = dv.getUint16(eocd + 10, true);
+  let off = dv.getUint32(eocd + 16, true);
+  const out = [];
+  for (let k = 0; k < count && off + 46 <= buf.byteLength; k++) {
+    if (dv.getUint32(off, true) !== 0x02014b50) break;
+    const method   = dv.getUint16(off + 10, true);
+    const csize    = dv.getUint32(off + 20, true);
+    const nameLen  = dv.getUint16(off + 28, true);
+    const extraLen = dv.getUint16(off + 30, true);
+    const cmtLen   = dv.getUint16(off + 32, true);
+    const lho      = dv.getUint32(off + 42, true);
+    const name     = dec.decode(u8.subarray(off + 46, off + 46 + nameLen));
+    off += 46 + nameLen + extraLen + cmtLen;
+    if (name.endsWith("/")) continue;
+    if (!/\.(json|jsonl|ndjson|txt)$/i.test(name)) continue;
+    const lnLen = dv.getUint16(lho + 26, true), leLen = dv.getUint16(lho + 28, true);
+    const start = lho + 30 + lnLen + leLen;
+    const raw = u8.subarray(start, start + csize);
+    let bytes;
+    if (method === 0) bytes = raw;
+    else if (method === 8) bytes = await inflateRaw(raw);
+    else { state.warnings.push(`skipped ${name} (compression method ${method})`); continue; }
+    out.push({ name, text: dec.decode(bytes) });
+  }
+  if (!out.length) throw new Error("That zip holds no .json or .jsonl files.");
+  return out;
+}
+
+/* ── text out of whatever a content block turns out to be ── */
+
+function blockText(c, sink) {
+  if (c == null) return "";
+  if (typeof c === "string") return c;
+  if (Array.isArray(c)) return c.map(x => blockText(x, sink)).filter(Boolean).join("\n");
+  if (typeof c !== "object") return "";
+  if (c.type === "thinking" || c.type === "redacted_thinking") {
+    const t = typeof c.thinking === "string" ? c.thinking : "";
+    if (sink) sink.think.push(t);
+    return "";
+  }
+  if (c.type === "tool_use" || c.type === "server_tool_use") return "";
+  if (c.type === "tool_result") return blockText(c.content, sink);
+  if (typeof c.text === "string") return c.text;
+  if (Array.isArray(c.parts)) return c.parts.filter(p => typeof p === "string").join("\n");
+  if (c.content !== undefined) return blockText(c.content, sink);
+  return "";
+}
+
+const ts = v => {
+  if (v == null) return null;
+  if (typeof v === "number") return v > 1e11 ? v : v * 1000;   /* s vs ms */
+  const n = Date.parse(v);
+  return Number.isNaN(n) ? null : n;
+};
+
+function mkMsg(role, raw) {
+  const sink = { think: [] };
+  const text = blockText(raw, sink).trim();
+  return { role, text, think: sink.think.join("\n\n").trim() };
+}
+
+/* ── the known shapes ────────────────────────────────────── */
+
+/* claude.ai: [{uuid, name, created_at, chat_messages:[{sender, text, content}]}] */
+function fromClaudeAi(list, src) {
+  return list.map(c => {
+    const msgs = [];
+    for (const m of (c.chat_messages || [])) {
+      const role = (m.sender === "human" || m.sender === "user") ? "human" : "assistant";
+      const mm = mkMsg(role, m.content && m.content.length ? m.content : m.text);
+      mm.t = ts(m.created_at);
+      if (mm.text || mm.think) msgs.push(mm);
+    }
+    return mkConv(c.uuid, c.name, ts(c.created_at), msgs, src, "claude.ai");
+  });
+}
+
+/* Claude Code: one .jsonl per session; lines carry parentUuid chains */
+function fromClaudeCode(records, src) {
+  const bySession = new Map();
+  for (const r of records) {
+    if (!r || !r.message) continue;
+    const role = r.message.role === "user" || r.type === "user" ? "human" : "assistant";
+    if (r.type === "summary" || r.isMeta) continue;
+    const mm = mkMsg(role, r.message.content);
+    mm.t = ts(r.timestamp);
+    if (!mm.text && !mm.think) continue;
+    const key = r.sessionId || src;
+    if (!bySession.has(key)) bySession.set(key, { cwd: r.cwd, msgs: [] });
+    bySession.get(key).msgs.push(mm);
+  }
+  const out = [];
+  for (const [id, s] of bySession) {
+    const first = s.msgs.find(m => m.role === "human");
+    const title = first ? firstLine(first.text) : (s.cwd ? s.cwd.split("/").pop() : "session");
+    const t0 = s.msgs.reduce((a, m) => (m.t && (!a || m.t < a) ? m.t : a), null);
+    out.push(mkConv(id, title, t0, s.msgs, src, "claude code"));
+  }
+  return out;
+}
+
+/* ChatGPT: [{title, create_time, mapping:{id:{message:{author,content}, parent}}}] */
+function fromChatGpt(list, src) {
+  return list.map(c => {
+    const nodes = Object.values(c.mapping || {});
+    const msgs = [];
+    for (const n of nodes) {
+      const m = n && n.message;
+      if (!m || !m.author) continue;
+      const r = m.author.role;
+      if (r !== "user" && r !== "assistant") continue;
+      const mm = mkMsg(r === "user" ? "human" : "assistant", m.content);
+      mm.t = ts(m.create_time);
+      if (mm.text) msgs.push(mm);
+    }
+    msgs.sort((a, b) => (a.t || 0) - (b.t || 0));
+    return mkConv(c.id || c.conversation_id, c.title, ts(c.create_time), msgs, src, "chatgpt");
+  });
+}
+
+/* bare [{role, content}] — one conversation */
+function fromBare(list, src) {
+  const msgs = [];
+  for (const m of list) {
+    const r = (m.role || m.sender || "").toLowerCase();
+    const mm = mkMsg(r === "user" || r === "human" ? "human" : "assistant", m.content !== undefined ? m.content : m.text);
+    mm.t = ts(m.created_at || m.timestamp || m.create_time);
+    if (mm.text || mm.think) msgs.push(mm);
+  }
+  return [mkConv(src, src.replace(/\.[^.]+$/, ""), msgs.length ? msgs[0].t : null, msgs, src, "raw messages")];
+}
+
+function firstLine(s) {
+  const l = (s || "").split("\n").map(x => x.trim()).find(Boolean) || "untitled";
+  return l.length > 78 ? l.slice(0, 78) + "…" : l;
+}
+
+function mkConv(id, title, t0, msgs, src, kind) {
+  let words = 0, hw = 0, aw = 0;
+  for (const m of msgs) {
+    const n = countWords(m.text) + countWords(m.think);
+    words += n;
+    if (m.role === "human") hw += n; else aw += n;
+  }
+  const times = msgs.map(m => m.t).filter(Boolean);
+  return {
+    id: String(id || Math.random().toString(36).slice(2)),
+    title: (title && String(title).trim()) || (msgs.length ? firstLine(msgs[0].text) : "untitled"),
+    t: t0 || (times.length ? Math.min(...times) : null),
+    tEnd: times.length ? Math.max(...times) : (t0 || null),
+    msgs, words, hw, aw, src, kind,
+  };
+}
+
+const countWords = s => { if (!s) return 0; const m = s.match(/\S+/g); return m ? m.length : 0; };
+
+/* ── sniff ───────────────────────────────────────────────── */
+
+function parseFile(name, text) {
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  /* JSONL, by extension or by shape */
+  const looksJsonl = /\.(jsonl|ndjson)$/i.test(name) ||
+    (trimmed[0] === "{" && /\}\s*\n\s*\{/.test(trimmed.slice(0, 20000)));
+  if (looksJsonl) {
+    const recs = [];
+    let bad = 0;
+    for (const line of trimmed.split("\n")) {
+      const l = line.trim();
+      if (!l) continue;
+      try { recs.push(JSON.parse(l)); } catch (e) { bad++; }
+    }
+    if (bad) state.warnings.push(`${name}: ${bad} unparseable line${bad > 1 ? "s" : ""} skipped`);
+    if (!recs.length) throw new Error(`${name}: no valid JSON lines.`);
+    if (recs.some(r => r && r.message && (r.sessionId || r.parentUuid !== undefined || r.type)))
+      return fromClaudeCode(recs, name);
+    if (recs.some(r => r && r.chat_messages)) return fromClaudeAi(recs.filter(r => r.chat_messages), name);
+    if (recs.some(r => r && (r.role || r.sender))) return fromBare(recs, name);
+    throw new Error(`${name}: JSONL, but no messages I recognise.`);
+  }
+
+  let data;
+  try { data = JSON.parse(trimmed); }
+  catch (e) { throw new Error(`${name}: not valid JSON.\n${e.message}`); }
+
+  const arr = Array.isArray(data) ? data : [data];
+  const probe = arr.find(x => x && typeof x === "object") || {};
+
+  if (probe.chat_messages) return fromClaudeAi(arr.filter(c => c && c.chat_messages), name);
+  if (probe.mapping)       return fromChatGpt(arr.filter(c => c && c.mapping), name);
+  if (probe.message && (probe.sessionId || probe.parentUuid !== undefined)) return fromClaudeCode(arr, name);
+  if (probe.role || probe.sender) return fromBare(arr, name);
+  if (!Array.isArray(data) && Array.isArray(data.messages)) return fromBare(data.messages, name);
+  if (!Array.isArray(data) && Array.isArray(data.conversations)) return parseFile(name, JSON.stringify(data.conversations));
+
+  /* not a transcript — users.json, projects.json, package.json … */
+  return [];
+}
+
+/* ── drop / pick plumbing ────────────────────────────────── */
+
+async function entriesFromDrop(dt) {
+  const out = [];
+  const items = dt.items ? Array.from(dt.items) : [];
+  const roots = items.map(i => (i.webkitGetAsEntry ? i.webkitGetAsEntry() : null)).filter(Boolean);
+  if (!roots.length) return Array.from(dt.files || []);
+  const walk = entry => new Promise(res => {
+    if (entry.isFile) { entry.file(f => { out.push(f); res(); }, () => res()); return; }
+    if (!entry.isDirectory) return res();
+    const rdr = entry.createReader();
+    const batch = () => rdr.readEntries(async es => {
+      if (!es.length) return res();
+      await Promise.all(es.map(walk));
+      batch();
+    }, () => res());
+    batch();
+  });
+  await Promise.all(roots.map(walk));
+  return out;
+}
+
+async function ingest(files) {
+  state.warnings = [];
+  const convs = [];
+  const names = [];
+  let looked = 0;
+  for (const f of files) {
+    if (/\.zip$/i.test(f.name)) {
+      const members = await readZip(await f.arrayBuffer());
+      for (const m of members) {
+        looked++;
+        const got = parseFile(m.name, m.text);
+        if (got.length) { convs.push(...got); names.push(m.name); }
+      }
+    } else if (/\.(json|jsonl|ndjson|txt)$/i.test(f.name)) {
+      looked++;
+      const got = parseFile(f.name, await f.text());
+      if (got.length) { convs.push(...got); names.push(f.name); }
+    }
+  }
+  if (!looked) throw new Error("No .json, .jsonl or .zip in what you dropped.");
+  const kept = convs.filter(c => c.msgs.length > 0);
+  if (!kept.length)
+    throw new Error("Read " + looked + " file(s), found no conversations.\n" +
+      "If this is a claude.ai export, the file you want is conversations.json.");
+  kept.sort((a, b) => (a.t || 0) - (b.t || 0));
+  state.convs = kept;
+  const kinds = Array.from(new Set(kept.map(c => c.kind)));
+  state.sourceLabel = kinds.join(" + ") + " · " + names.slice(0, 3).join(", ") + (names.length > 3 ? ` +${names.length - 3}` : "");
+  return kept;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   2 · WORDS
+   This is the honest part. There is no model here. Themes are
+   words that are frequent in one conversation and rare across
+   the rest — tf-idf, the oldest trick there is. It finds what
+   you *said*, never what you meant, and it cannot tell that
+   "grief" and "my mother died" belong together.
+   ═══════════════════════════════════════════════════════════ */
+
+const STOP = new Set((
+  "a about above across after again against all almost along already also although always am among an and another any anybody anyone anything anyway are aren't around as at away " +
+  "back be became because become becomes been before began begin behind being below beside besides best better between beyond both bring but by " +
+  "came can cannot can't come comes coming could couldn't did didn't do does doesn't doing done don't down during " +
+  "each either else enough etc even ever every everybody everyone everything except " +
+  "far few find first for found from further " +
+  "gave get gets getting give given go goes going gone good got great had hadn't half has hasn't have haven't having he he'd he'll her here here's hers herself he's him himself his how however how's " +
+  "i i'd if i'll i'm in indeed inside instead into is isn't it it's its itself i've " +
+  "just keep kept kind know known knows " +
+  "last later least left less let let's like likely little long look looking looks lot " +
+  "made make makes making many may maybe me mean means might mine more most much must my myself " +
+  "near need needs neither never new next no nobody none nor not nothing now " +
+  "of off often oh ok okay on once one only onto or other others otherwise ought our ours ourselves out over own " +
+  "part per perhaps place please put " +
+  "quite rather really right said same saw say saying says see seem seemed seems seen several shall she she'd she'll she's should shouldn't show side since so some somebody somehow someone something sometimes somewhat soon still such sure " +
+  "take taken takes tell than that that's the their theirs them themselves then there therefore there's these they they'd they'll they're they've thing things think this those though thought three through thus time times to together too took toward towards try trying two " +
+  "under until up upon us use used uses using usually " +
+  "very want wants was wasn't way ways we we'd well we'll went were we're weren't we've what whatever what's when whenever when's where where's whether which while who whole whom who's whose why why's will with within without won't would wouldn't " +
+  "yes yet you you'd you'll your yours yourself yourselves you're you've"
+).split(" "));
+
+/* words that are about the medium, not the subject */
+const CHATTER = new Set((
+  "actually anthropic ask asked asking assistant chat claude conversation exactly file files gpt " +
+  "help helpful here hey human llm maybe message model prompt question questions reply response " +
+  "sorry thank thanks user yeah yep"
+).split(" "));
+
+function stripNoise(s, dropCode) {
+  let t = s;
+  if (dropCode) {
+    t = t.replace(/```[\s\S]*?```/g, " ");
+    t = t.replace(/`[^`\n]{1,200}`/g, " ");
+    t = t.replace(/^(?: {4}|\t).*$/gm, " ");
+  }
+  t = t.replace(/https?:\/\/\S+/g, " ");
+  t = t.replace(/\b[\w.+-]+@[\w-]+\.[\w.]+\b/g, " ");
+  return t;
+}
+
+function tokenize(text) {
+  const out = [];
+  const re = /[a-z][a-z'’-]*/g;
+  let m;
+  const low = text.toLowerCase().replace(/’/g, "'");
+  while ((m = re.exec(low))) {
+    let w = m[0].replace(/^[-']+|[-']+$/g, "");
+    if (w.length < 3 || w.length > 28) continue;
+    out.push(w);
+  }
+  return out;
+}
+
+/* Collapse morphological variants onto whichever surface form
+   is commonest. Not a stemmer — a vote. */
+function buildMerge(globalCount) {
+  const cand = w => {
+    const c = [];
+    if (w.endsWith("ies") && w.length > 5) c.push(w.slice(0, -3) + "y");
+    if (w.endsWith("sses")) c.push(w.slice(0, -2));
+    else if (w.endsWith("es") && w.length > 4) c.push(w.slice(0, -2), w.slice(0, -1));
+    else if (w.endsWith("s") && !w.endsWith("ss") && w.length > 3) c.push(w.slice(0, -1));
+    if (w.endsWith("ing") && w.length > 5) c.push(w.slice(0, -3), w.slice(0, -3) + "e");
+    if (w.endsWith("ed") && w.length > 4) c.push(w.slice(0, -2), w.slice(0, -1));
+    if (w.endsWith("ly") && w.length > 5) c.push(w.slice(0, -2));
+    return c;
+  };
+  const map = new Map();
+  for (const [w, n] of globalCount) {
+    for (const b of cand(w)) {
+      const bn = globalCount.get(b);
+      if (bn !== undefined && bn >= n) { map.set(w, b); break; }
+    }
+  }
+  /* follow chains, guard cycles */
+  const root = new Map();
+  for (const w of map.keys()) {
+    let cur = w, hops = 0;
+    const seen = new Set([w]);
+    while (map.has(cur) && hops++ < 6) {
+      const nx = map.get(cur);
+      if (seen.has(nx)) break;
+      seen.add(nx); cur = nx;
+    }
+    if (cur !== w) root.set(w, cur);
+  }
+  return root;
+}
+
+function buildIndex(convs, opts) {
+  const scope = opts.scope, dropCode = !opts.code, useThink = opts.think;
+  const extra = new Set(String(opts.extraStop || "").toLowerCase().split(/[\s,]+/).filter(Boolean));
+  const skip = w => STOP.has(w) || CHATTER.has(w) || extra.has(w);
+
+  /* pass 1 — raw counts */
+  const raw = [];
+  const global = new Map();
+  for (const c of convs) {
+    const counts = new Map();
+    for (const m of c.msgs) {
+      if (scope === "human" && m.role !== "human") continue;
+      if (scope === "assistant" && m.role !== "assistant") continue;
+      let body = m.text;
+      if (useThink && m.think) body += "\n" + m.think;
+      for (const w of tokenize(stripNoise(body, dropCode))) {
+        if (skip(w)) continue;
+        counts.set(w, (counts.get(w) || 0) + 1);
+        global.set(w, (global.get(w) || 0) + 1);
+      }
+    }
+    raw.push(counts);
+  }
+
+  /* pass 2 — merge variants */
+  const merge = buildMerge(global);
+  const docs = raw.map(counts => {
+    if (!merge.size) return counts;
+    const out = new Map();
+    for (const [w, n] of counts) {
+      const k = merge.get(w) || w;
+      out.set(k, (out.get(k) || 0) + n);
+    }
+    return out;
+  });
+
+  /* pass 3 — df, vocab, tf-idf */
+  const N = docs.length;
+  const df = new Map();
+  for (const d of docs) for (const w of d.keys()) df.set(w, (df.get(w) || 0) + 1);
+
+  /* Terms in only one conversation are noise; terms in most of them are
+     background. Below a dozen conversations neither filter has enough to
+     work with, so both stand down. */
+  const minDf = N >= 12 ? 2 : 1;
+  const maxDf = N < 12 ? N : Math.max(2, Math.floor(N * 0.6));
+  const sift = (lo, hi) => { const v = []; for (const [w, n] of df) if (n >= lo && n <= hi) v.push(w); return v.sort(); };
+
+  let vocab = sift(minDf, maxDf), relaxed = false;
+  /* A small corpus that is all one subject can have every word fall foul of
+     the "too common to be a theme" filter, leaving nothing at all. Better to
+     show the common words and say so than to show an empty page. */
+  if (vocab.length < 8) { vocab = sift(1, N); relaxed = vocab.length > 0; }
+  const vi = new Map(vocab.map((w, i) => [w, i]));
+
+  const vectors = docs.map(d => {
+    const idx = [], val = [];
+    for (const [w, tf] of d) {
+      const i = vi.get(w);
+      if (i === undefined) continue;
+      idx.push(i);
+      /* Smoothed idf (+1): without it a term present in every conversation
+         weighs exactly zero, which wipes out a single-conversation corpus
+         entirely. Ordering is unaffected. */
+      val.push((1 + Math.log(tf)) * (Math.log((1 + N) / (1 + df.get(w))) + 1));
+    }
+    let norm = 0;
+    for (const v of val) norm += v * v;
+    norm = Math.sqrt(norm) || 1;
+    for (let j = 0; j < val.length; j++) val[j] /= norm;
+    return { idx: Int32Array.from(idx), val: Float64Array.from(val) };
+  });
+
+  /* global mass per term — what the corpus is *about* */
+  const mass = new Float64Array(vocab.length);
+  vectors.forEach(v => { for (let j = 0; j < v.idx.length; j++) mass[v.idx[j]] += v.val[j]; });
+
+  return { vocab, vi, df, docs, vectors, mass, N, totals: global, merge, relaxed };
+}
+
+/* phrases — bigrams/trigrams that hold together */
+function phrases(convs, opts, limit) {
+  const dropCode = !opts.code, scope = opts.scope;
+  const extra = new Set(String(opts.extraStop || "").toLowerCase().split(/[\s,]+/).filter(Boolean));
+  const bad = w => STOP.has(w) || CHATTER.has(w) || extra.has(w);
+  const bi = new Map(), tri = new Map();
+  const seenIn = new Map();
+  convs.forEach((c, ci) => {
+    for (const m of c.msgs) {
+      if (scope === "human" && m.role !== "human") continue;
+      if (scope === "assistant" && m.role !== "assistant") continue;
+      for (const sent of stripNoise(m.text, dropCode).split(/[.!?;:\n]+/)) {
+        const t = tokenize(sent);
+        for (let i = 0; i + 1 < t.length; i++) {
+          if (bad(t[i]) || bad(t[i + 1])) continue;
+          const k = t[i] + " " + t[i + 1];
+          bi.set(k, (bi.get(k) || 0) + 1);
+          if (!seenIn.has(k)) seenIn.set(k, new Set());
+          seenIn.get(k).add(ci);
+          if (i + 2 < t.length && !bad(t[i + 2])) {
+            const k3 = k + " " + t[i + 2];
+            tri.set(k3, (tri.get(k3) || 0) + 1);
+            if (!seenIn.has(k3)) seenIn.set(k3, new Set());
+            seenIn.get(k3).add(ci);
+          }
+        }
+      }
+    }
+  });
+  const all = [];
+  const minConvs = convs.length >= 20 ? 2 : 1;
+  for (const [k, n] of tri) if (n >= 3 && seenIn.get(k).size >= minConvs) all.push({ p: k, n, c: seenIn.get(k).size, w: 3 });
+  for (const [k, n] of bi)  if (n >= 3 && seenIn.get(k).size >= minConvs) all.push({ p: k, n, c: seenIn.get(k).size, w: 2 });
+  /* prefer phrases that spread across conversations, not one rant */
+  all.sort((a, b) => (b.c * Math.log(1 + b.n) * (b.w === 3 ? 1.25 : 1)) - (a.c * Math.log(1 + a.n) * (a.w === 3 ? 1.25 : 1)));
+  /* drop trigram-subsumed bigrams */
+  const keep = [], taken = [];
+  for (const p of all) {
+    if (keep.length >= limit) break;
+    if (taken.some(t => t.includes(p.p))) continue;
+    keep.push(p); taken.push(p.p);
+  }
+  return keep;
+}
+
+/* ── k-means on the unit sphere (cosine) ─────────────────── */
+
+const mulberry = s => () => (s = s + 0x6D2B79F5 | 0, ((t => (t = Math.imul(t ^ t >>> 15, t | 1), t ^= t + Math.imul(t ^ t >>> 7, t | 61), ((t ^ t >>> 14) >>> 0) / 4294967296))(s)));
+
+const dotSparse = (v, dense) => { let s = 0; for (let j = 0; j < v.idx.length; j++) s += v.val[j] * dense[v.idx[j]]; return s; };
+
+function kmeans(vectors, V, k, seed) {
+  const n = vectors.length;
+  k = Math.max(1, Math.min(k, n));
+  const rnd = mulberry(seed || 1337);
+  const cents = [];
+  const pick = i => { const c = new Float64Array(V); const v = vectors[i]; for (let j = 0; j < v.idx.length; j++) c[v.idx[j]] = v.val[j]; return c; };
+
+  /* k-means++ */
+  cents.push(pick(Math.floor(rnd() * n)));
+  const d2 = new Float64Array(n).fill(Infinity);
+  while (cents.length < k) {
+    const last = cents[cents.length - 1];
+    let total = 0;
+    for (let i = 0; i < n; i++) {
+      const d = Math.max(0, 1 - dotSparse(vectors[i], last));
+      if (d * d < d2[i]) d2[i] = d * d;
+      total += d2[i];
+    }
+    let r = rnd() * total, pickIdx = n - 1;
+    for (let i = 0; i < n; i++) { r -= d2[i]; if (r <= 0) { pickIdx = i; break; } }
+    cents.push(pick(pickIdx));
+  }
+
+  const assign = new Int32Array(n).fill(-1);
+  for (let iter = 0; iter < 40; iter++) {
+    let moved = 0;
+    for (let i = 0; i < n; i++) {
+      let best = 0, bs = -Infinity;
+      for (let c = 0; c < cents.length; c++) {
+        const s = dotSparse(vectors[i], cents[c]);
+        if (s > bs) { bs = s; best = c; }
+      }
+      if (assign[i] !== best) { assign[i] = best; moved++; }
+    }
+    if (!moved && iter) break;
+    const acc = Array.from({ length: cents.length }, () => new Float64Array(V));
+    const cnt = new Int32Array(cents.length);
+    for (let i = 0; i < n; i++) {
+      const a = acc[assign[i]], v = vectors[i];
+      for (let j = 0; j < v.idx.length; j++) a[v.idx[j]] += v.val[j];
+      cnt[assign[i]]++;
+    }
+    for (let c = 0; c < cents.length; c++) {
+      if (!cnt[c]) { cents[c] = pick(Math.floor(rnd() * n)); continue; }
+      let norm = 0;
+      for (let j = 0; j < V; j++) norm += acc[c][j] * acc[c][j];
+      norm = Math.sqrt(norm) || 1;
+      for (let j = 0; j < V; j++) acc[c][j] /= norm;
+      cents[c] = acc[c];
+    }
+  }
+  return { assign, cents };
+}
+
+/* how distinctive each term is to a cluster: mean inside − mean outside */
+function labelClusters(index, km, perLabel) {
+  const { vocab, vectors } = index;
+  const K = km.cents.length, V = vocab.length;
+  const inSum = Array.from({ length: K }, () => new Float64Array(V));
+  const inCnt = new Int32Array(K);
+  const allSum = new Float64Array(V);
+  vectors.forEach((v, i) => {
+    const c = km.assign[i];
+    inCnt[c]++;
+    for (let j = 0; j < v.idx.length; j++) { inSum[c][v.idx[j]] += v.val[j]; allSum[v.idx[j]] += v.val[j]; }
+  });
+  const n = vectors.length;
+  const out = [];
+  for (let c = 0; c < K; c++) {
+    const members = [];
+    for (let i = 0; i < n; i++) if (km.assign[i] === c) members.push(i);
+    const nc = inCnt[c] || 1, no = Math.max(1, n - inCnt[c]);
+    const scored = [];
+    for (let j = 0; j < V; j++) {
+      if (!inSum[c][j]) continue;
+      const inside = inSum[c][j] / nc, outside = (allSum[j] - inSum[c][j]) / no;
+      const s = inside - outside;
+      if (s > 0) scored.push([j, s]);
+    }
+    scored.sort((a, b) => b[1] - a[1]);
+    /* the members most typical of the cluster — what to show a reader, or a
+       model, when asking what this group actually is */
+    const mean = inSum[c];
+    const rep = members
+      .map(i => [i, dotSparse(vectors[i], mean)])
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([i]) => i);
+    out.push({
+      terms: scored.slice(0, perLabel).map(([j]) => vocab[j]),
+      members, rep,
+      size: members.length,
+    });
+  }
+  out.sort((a, b) => b.size - a.size);
+  return out;
+}
+
+/* ── 2-D projection: PCA by power iteration, mean-centred ── */
+
+function project(index) {
+  const { vectors, vocab } = index;
+  const n = vectors.length, V = vocab.length;
+  if (n < 3) return vectors.map((_, i) => [i ? 1 : -1, 0]);
+
+  const mean = new Float64Array(V);
+  vectors.forEach(v => { for (let j = 0; j < v.idx.length; j++) mean[v.idx[j]] += v.val[j]; });
+  for (let j = 0; j < V; j++) mean[j] /= n;
+
+  const rnd = mulberry(7);
+  const axes = [];
+  for (let a = 0; a < 2; a++) {
+    let vec = new Float64Array(V);
+    for (let j = 0; j < V; j++) vec[j] = rnd() - 0.5;
+    for (let it = 0; it < 60; it++) {
+      /* orthogonalise against earlier axes */
+      for (const p of axes) { let d = 0; for (let j = 0; j < V; j++) d += vec[j] * p[j]; for (let j = 0; j < V; j++) vec[j] -= d * p[j]; }
+      let mv = 0; for (let j = 0; j < V; j++) mv += mean[j] * vec[j];
+      const u = new Float64Array(n);
+      for (let i = 0; i < n; i++) u[i] = dotSparse(vectors[i], vec) - mv;
+      const next = new Float64Array(V);
+      let usum = 0;
+      for (let i = 0; i < n; i++) {
+        const w = u[i], v = vectors[i];
+        usum += w;
+        for (let j = 0; j < v.idx.length; j++) next[v.idx[j]] += w * v.val[j];
+      }
+      for (let j = 0; j < V; j++) next[j] -= usum * mean[j];
+      let norm = 0; for (let j = 0; j < V; j++) norm += next[j] * next[j];
+      norm = Math.sqrt(norm);
+      if (!norm || !isFinite(norm)) break;
+      for (let j = 0; j < V; j++) next[j] /= norm;
+      vec = next;
+    }
+    for (const p of axes) { let d = 0; for (let j = 0; j < V; j++) d += vec[j] * p[j]; for (let j = 0; j < V; j++) vec[j] -= d * p[j]; }
+    let norm = 0; for (let j = 0; j < V; j++) norm += vec[j] * vec[j];
+    norm = Math.sqrt(norm) || 1;
+    for (let j = 0; j < V; j++) vec[j] /= norm;
+    axes.push(vec);
+  }
+
+  const mv = axes.map(a => { let s = 0; for (let j = 0; j < V; j++) s += mean[j] * a[j]; return s; });
+  return vectors.map(v => [dotSparse(v, axes[0]) - mv[0], dotSparse(v, axes[1]) - mv[1]]);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   3 · RENDER
+   ═══════════════════════════════════════════════════════════ */
+
+const RAMP = ["#151c24", "#1c2c3a", "#243d52", "#2e516e", "#43708f", "#6693b0", "#94bcd6"];
+const rampAt = f => RAMP[Math.max(0, Math.min(RAMP.length - 1, Math.round(f * (RAMP.length - 1))))];
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const num = n => n.toLocaleString();
+const compact = n => n >= 1e6 ? (n / 1e6).toFixed(1) + "m" : n >= 1e4 ? Math.round(n / 1e3) + "k" : n >= 1000 ? (n / 1000).toFixed(1) + "k" : String(n);
+const dstr = t => t ? new Date(t).toISOString().slice(0, 10) : "undated";
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/* shared tooltip — every mark carries one */
+const tip = $("#tip");
+function bindTip(el, html) {
+  el.addEventListener("pointerenter", () => { tip.innerHTML = html; tip.classList.add("on"); });
+  el.addEventListener("pointermove", e => {
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = Math.min(window.innerWidth - w - 10, e.clientX + 14) + "px";
+    tip.style.top = Math.max(6, e.clientY - h - 12) + "px";
+  });
+  el.addEventListener("pointerleave", () => tip.classList.remove("on"));
+}
+
+function barRows(items, fmt) {
+  const max = Math.max(...items.map(i => i.v), 1);
+  return `<div class="bars">` + items.map(i => `
+    <div class="row">
+      <div class="lab" title="${esc(i.k)}">${esc(i.k)}</div>
+      <div class="track"><div class="fill" style="width:${Math.max(0.6, i.v / max * 100)}%"></div></div>
+      <div class="val">${fmt ? fmt(i.v) : compact(i.v)}</div>
+    </div>`).join("") + `</div>`;
+}
+
+function columns(items, labelEvery) {
+  const max = Math.max(...items.map(i => i.v), 1);
+  const cols = items.map(i => `<div class="col" data-tip="${esc(i.k)} — <b>${num(i.v)}</b> ${esc(i.unit || "")}"><i style="height:${i.v / max * 100}%"></i></div>`).join("");
+  const axis = items.map((i, n) => `<span>${(n % labelEvery === 0) ? esc(i.short !== undefined ? i.short : i.k) : ""}</span>`).join("");
+  return `<div class="cols">${cols}</div><div class="colaxis">${axis}</div>`;
+}
+
+function wireColumns(root) {
+  $$(".cols .col", root).forEach(c => bindTip(c, c.dataset.tip));
+}
+
+function toggleTable(btn, html) {
+  let open = false, holder = document.createElement("div");
+  btn.after(holder);
+  btn.addEventListener("click", () => {
+    open = !open;
+    holder.innerHTML = open ? html : "";
+    btn.textContent = open ? "hide the numbers" : "show the numbers";
+  });
+}
+
+/* ── time buckets ───────────────────────────────────────── */
+
+function bucketiser(convs) {
+  const times = convs.map(c => c.t).filter(Boolean);
+  if (!times.length) return null;
+  const lo = Math.min(...times), hi = Math.max(...times);
+  const days = (hi - lo) / 864e5;
+  const mode = days > 1100 ? "quarter" : days > 120 ? "month" : days > 28 ? "week" : "day";
+  const key = t => {
+    const d = new Date(t);
+    if (mode === "quarter") return d.getUTCFullYear() + "-Q" + (Math.floor(d.getUTCMonth() / 3) + 1);
+    if (mode === "month")   return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0");
+    if (mode === "week")    { const s = new Date(t); s.setUTCDate(s.getUTCDate() - s.getUTCDay()); return s.toISOString().slice(0, 10); }
+    return d.toISOString().slice(0, 10);
+  };
+  const label = k => {
+    if (mode === "month") { const [y, m] = k.split("-"); return MON[+m - 1] + " " + y.slice(2); }
+    if (mode === "week" || mode === "day") { const d = new Date(k); return MON[d.getUTCMonth()] + " " + d.getUTCDate(); }
+    return k;
+  };
+  const order = [];
+  const seen = new Set();
+  /* fill gaps so an empty stretch reads as empty, not as absent */
+  let cur = new Date(lo);
+  const step = () => {
+    if (mode === "quarter") cur.setUTCMonth(cur.getUTCMonth() + 3);
+    else if (mode === "month") cur.setUTCMonth(cur.getUTCMonth() + 1);
+    else if (mode === "week") cur.setUTCDate(cur.getUTCDate() + 7);
+    else cur.setUTCDate(cur.getUTCDate() + 1);
+  };
+  let guard = 0;
+  while (cur.getTime() <= hi && guard++ < 600) { const k = key(cur.getTime()); if (!seen.has(k)) { seen.add(k); order.push(k); } step(); }
+  const lastK = key(hi);
+  if (!seen.has(lastK)) order.push(lastK);
+  return { mode, key, label, order };
+}
+
+/* ═══ VIEW: CORPUS ═════════════════════════════════════════ */
+
+function renderCorpus() {
+  const cs = state.convs;
+  const msgs = cs.reduce((a, c) => a + c.msgs.length, 0);
+  const hw = cs.reduce((a, c) => a + c.hw, 0);
+  const aw = cs.reduce((a, c) => a + c.aw, 0);
+  const times = cs.map(c => c.t).filter(Boolean);
+  const span = times.length ? Math.round((Math.max(...times) - Math.min(...times)) / 864e5) : 0;
+  const lens = cs.map(c => c.msgs.length).sort((a, b) => a - b);
+  const median = lens.length ? lens[Math.floor(lens.length / 2)] : 0;
+  const longest = cs.reduce((a, c) => (c.words > (a ? a.words : -1) ? c : a), null);
+
+  const hours = new Array(24).fill(0);
+  for (const c of cs) for (const m of c.msgs) if (m.role === "human" && m.t) hours[new Date(m.t).getHours()]++;
+  const anyHour = hours.some(h => h);
+  const peak = anyHour ? hours.indexOf(Math.max(...hours)) : null;
+
+  const b = bucketiser(cs);
+  let volume = "";
+  if (b) {
+    const counts = new Map(b.order.map(k => [k, 0]));
+    for (const c of cs) if (c.t) counts.set(b.key(c.t), (counts.get(b.key(c.t)) || 0) + 1);
+    const items = b.order.map(k => ({ k: b.label(k), short: b.label(k), v: counts.get(k) || 0, unit: "conversations" }));
+    volume = `<h2>Volume</h2>
+      <p class="caption">Conversations started per ${b.mode}. <em>Hover a column for the count.</em></p>
+      ${columns(items, Math.max(1, Math.ceil(items.length / 12)))}`;
+  }
+
+  const hourChart = anyHour ? `<h2>Hour of day</h2>
+    <p class="caption">When your messages land, by local clock time on this machine.
+    <em>Export timestamps are UTC; your browser converts them.</em></p>
+    ${columns(hours.map((v, h) => ({ k: String(h).padStart(2, "0") + ":00", short: h % 3 === 0 ? String(h) : "", v, unit: "messages" })), 1)}` : "";
+
+  $("#v-corpus").innerHTML = `
+    <h2>The heap</h2>
+    <p class="caption">What is actually in the file, before any interpretation.</p>
+    <div class="tiles">
+      <div class="tile"><div class="n">${num(cs.length)}</div><div class="k">conversations</div></div>
+      <div class="tile"><div class="n">${num(msgs)}</div><div class="k">messages</div></div>
+      <div class="tile"><div class="n">${compact(hw)}</div><div class="k">words from you</div></div>
+      <div class="tile"><div class="n">${compact(aw)}</div><div class="k">words back</div></div>
+      <div class="tile"><div class="n">${num(span)} <small>days</small></div><div class="k">span</div></div>
+      <div class="tile"><div class="n">${num(median)}</div><div class="k">median messages</div></div>
+      ${peak !== null ? `<div class="tile"><div class="n">${String(peak).padStart(2, "0")}<small>:00</small></div><div class="k">busiest hour</div></div>` : ""}
+      <div class="tile"><div class="n">${compact(longest ? longest.words : 0)}</div><div class="k">longest thread</div></div>
+    </div>
+    <p class="caption" style="margin-top:14px">
+      ${times.length ? `First: <em>${dstr(Math.min(...times))}</em> · last: <em>${dstr(Math.max(...times))}</em>.` : "No usable timestamps in this export."}
+      ${longest ? ` Longest single thread: <em>${esc(longest.title)}</em>.` : ""}
+      ${cs.length - times.length ? ` ${cs.length - times.length} conversation(s) carry no date and sit out of the time charts.` : ""}
+    </p>
+    ${volume}
+    ${hourChart}
+    ${state.warnings.length ? `<h2>While reading</h2><p class="caption">${state.warnings.map(esc).join("<br>")}</p>` : ""}
+  `;
+  wireColumns($("#v-corpus"));
+}
+
+/* ═══ VIEW: THEMES ═════════════════════════════════════════ */
+
+function controlsHTML(extra) {
+  const o = state.opts;
+  return `<div class="ctl">
+    <label>Whose words
+      <span class="seg" data-ctl="scope">
+        <button data-val="both" class="${o.scope === "both" ? "on" : ""}">both</button>
+        <button data-val="human" class="${o.scope === "human" ? "on" : ""}">yours</button>
+        <button data-val="assistant" class="${o.scope === "assistant" ? "on" : ""}">claude's</button>
+      </span>
+    </label>
+    <label><input type="checkbox" data-ctl="code" ${o.code ? "checked" : ""}> include code</label>
+    <label><input type="checkbox" data-ctl="think" ${o.think ? "checked" : ""}> include thinking</label>
+    <label>ignore <input type="text" data-ctl="extraStop" value="${esc(o.extraStop)}" placeholder="words, space-separated" size="22"></label>
+    ${extra || ""}
+  </div>`;
+}
+
+function wireControls(root) {
+  $$("[data-ctl]", root).forEach(el => {
+    const key = el.dataset.ctl;
+    if (el.classList.contains("seg")) {
+      $$("button", el).forEach(b => b.addEventListener("click", () => { state.opts[key] = b.dataset.val; recompute(); }));
+    } else if (el.type === "checkbox") {
+      el.addEventListener("change", () => { state.opts[key] = el.checked; recompute(); });
+    } else if (el.type === "range") {
+      el.addEventListener("input", () => { const t = $(".num[data-for=" + key + "]", root); if (t) t.textContent = el.value; });
+      el.addEventListener("change", () => { state.opts[key] = +el.value; recluster(); });
+    } else {
+      let t;
+      el.addEventListener("input", () => { clearTimeout(t); t = setTimeout(() => { state.opts[key] = el.value; recompute(); }, 450); });
+    }
+  });
+}
+
+function renderThemes() {
+  const ix = state.index;
+  const ranked = [];
+  for (let j = 0; j < ix.vocab.length; j++) ranked.push([j, ix.mass[j]]);
+  ranked.sort((a, b) => b[1] - a[1]);
+  const words = ranked.slice(0, 30).map(([j, v]) => ({
+    k: ix.vocab[j], v,
+    raw: ix.totals.get(ix.vocab[j]) || 0,
+    docs: ix.df.get(ix.vocab[j]) || 0,
+  }));
+
+  const ph = phrases(state.convs, state.opts, 24);
+
+  const tableHTML = `<table class="data"><thead><tr><th>term</th><th>weight</th><th>occurrences</th><th>conversations</th></tr></thead><tbody>` +
+    words.map(w => `<tr><td>${esc(w.k)}</td><td>${w.v.toFixed(2)}</td><td>${num(w.raw)}</td><td>${num(w.docs)}</td></tr>`).join("") +
+    `</tbody></table>`;
+
+  $("#v-themes").innerHTML = `
+    <h2>What keeps coming back</h2>
+    <p class="caption">Terms ranked by tf-idf weight summed over the corpus — frequent
+    <em>and</em> concentrated. A word you use constantly in every single conversation scores
+    low: it is background, not theme. <em>Hover a bar for its counts.</em></p>
+    ${controlsHTML()}
+    ${ix.relaxed ? `<p class="caption" style="color:var(--warm)">Every word here turns up in most of your
+    conversations, so the usual "common words aren't themes" filter had nothing left to keep and
+    has been switched off. With this few conversations, or this narrow a range, read the list as
+    plain frequency.</p>` : ""}
+    ${ix.vocab.length ? `<div id="topterms">${barRows(words.map(w => ({ k: w.k, v: w.v })), v => v.toFixed(1))}</div>` : `<p class="empty">No countable words — the messages may be all code, all punctuation, or empty.</p>`}
+    <button class="tablelink">show the numbers</button>
+    <h2>Phrases</h2>
+    <p class="caption">Two- and three-word runs that survive stopword filtering, ranked by how
+    many separate conversations they appear in. These read closer to subject matter than single
+    words do.</p>
+    ${ph.length ? barRows(ph.map(p => ({ k: p.p, v: p.c })), v => num(v) + " conv") : `<p class="empty">Nothing repeats often enough to count as a phrase yet.</p>`}
+    <h2>What this is not</h2>
+    <p class="caption">This is word counting. It has no idea what anything means. Two
+    conversations about the same thing in different vocabulary will not meet here; one word
+    used in two senses will be merged. Names, places and typos rank as themes if they recur.
+    Real semantic grouping needs embeddings, which needs a model, which needs a network call —
+    and this page makes none. Treat the output as a concordance, not a summary.</p>
+  `;
+  const wordRows = $$("#topterms .row", $("#v-themes"));
+  wordRows.forEach((r, i) => bindTip(r, `<b>${esc(words[i].k)}</b><br>${num(words[i].raw)} occurrences across ${num(words[i].docs)} of ${ix.N} conversations<br>weight ${words[i].v.toFixed(2)}`));
+  wireControls($("#v-themes"));
+  toggleTable($(".tablelink", $("#v-themes")), tableHTML);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   HAND-OFF
+   The page cannot call a model, and shouldn't — that was the
+   whole point of it making no network calls. But a model you
+   already have in a chat window is the same model an API key
+   would reach; the only difference is who carries the data.
+   So: the page prepares a packet, you walk it over, you walk
+   the answer back. You are the network call.
+   ═══════════════════════════════════════════════════════════ */
+
+const sigOf = c => c.terms.slice(0, 5).join("|");
+
+function excerpt(c, n) {
+  const m = c.msgs.find(x => x.role === "human" && x.text.trim()) || c.msgs[0];
+  if (!m) return "";
+  const t = m.text.replace(/```[\s\S]*?```/g, " [code] ").replace(/\s+/g, " ").trim();
+  return t.length > n ? t.slice(0, n).replace(/\s\S*$/, "") + "…" : t;
+}
+
+function buildDigest() {
+  return {
+    what: "conversation clusters, grouped by word statistics, from a personal chat export",
+    conversations: state.convs.length,
+    groups: state.clusters.map((c, i) => ({
+      id: i,
+      size: c.size,
+      distinctive_terms: c.terms,
+      examples: (c.rep || c.members.slice(0, 4)).map(m => ({
+        title: state.convs[m].title,
+        opens: excerpt(state.convs[m], 200),
+      })),
+    })),
+  };
+}
+
+const HANDOFF_PROMPT =
+`Below are clusters of my own conversations, grouped by word statistics — so the
+groupings are real but the names are just term salad. Each group has the words that
+set it apart from the rest, and a few conversations from the middle of it.
+
+Give each group a short human name: what it is actually about, in my terms not the
+counter's. Add one line on what that group of conversations seems to be FOR.
+
+Reply with only JSON, no prose around it:
+
+{"0": {"name": "...", "note": "..."}, "1": {"name": "...", "note": "..."}}
+
+Names under six words. If a group is a grab-bag with no real subject, say so — that is
+useful too, it means the grouping failed there.`;
+
+function handoffHTML() {
+  const named = state.clusters.filter(c => state.names.has(sigOf(c))).length;
+  return `
+    <h2>Hand it to a bro</h2>
+    <p class="caption">The names above are term salad, because counting is all this page can
+    do on its own. A model can read them properly — and a model in a chat window is the same
+    model an API key would reach. This page can't call one, so it packs a small parcel instead:
+    the distinctive terms and a few real excerpts per group. <em>Copy it, paste it to any Claude
+    you have open, paste the reply back.</em> Nothing moves unless you move it.</p>
+    <div class="handoff">
+      <div class="row">
+        <button class="btn" id="copyPacket">copy prompt + packet</button>
+        <button class="btn" id="dlPacket">download it as .json</button>
+        <span class="note" id="copyNote" style="margin-top:0"></span>
+      </div>
+      <details>
+        <summary>see exactly what you'd be handing over</summary>
+        <pre id="packetPreview"></pre>
+      </details>
+      <textarea id="namesIn" placeholder="paste the reply here — JSON, fenced or bare"></textarea>
+      <div class="row">
+        <button class="btn" id="applyNames">name the groups</button>
+        ${named ? `<button class="btn" id="clearNames">forget the names</button>` : ""}
+        <span class="note" id="nameNote" style="margin-top:0">${named ? `${named} of ${state.clusters.length} named` : ""}</span>
+      </div>
+      <p class="note">The packet carries excerpts of real messages — that's what makes the
+      naming work, and it's why the preview is there. Names stick to a group's fingerprint, so
+      they survive redraws but not a regrouping that genuinely changes what the group is.</p>
+    </div>`;
+}
+
+function parseNames(raw) {
+  let t = String(raw || "").trim();
+  if (!t) throw new Error("Nothing pasted.");
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) t = fence[1].trim();
+  /* A reply may be an object or an array, with or without chat around it —
+     take the outermost value of whichever bracket opens first. */
+  const oi = t.indexOf("{"), ai = t.indexOf("[");
+  if (oi < 0 && ai < 0) throw new Error("No JSON in that — paste the whole reply, or just its JSON part.");
+  const arr = ai >= 0 && (oi < 0 || ai < oi);
+  const open = arr ? ai : oi, close = t.lastIndexOf(arr ? "]" : "}");
+  if (close < open) throw new Error("That JSON looks cut off — check the reply copied whole.");
+  t = t.slice(open, close + 1);
+  let data;
+  try { data = JSON.parse(t); } catch (e) { throw new Error("That isn't valid JSON — paste the reply as it came, or just the JSON part."); }
+
+  const pairs = [];
+  if (Array.isArray(data)) data.forEach((v, i) => pairs.push([v && v.id !== undefined ? v.id : i, v]));
+  else for (const k of Object.keys(data)) pairs.push([k, data[k]]);
+
+  let n = 0;
+  for (const [k, v] of pairs) {
+    const i = parseInt(k, 10);
+    if (!Number.isInteger(i) || i < 0 || i >= state.clusters.length) continue;
+    const name = typeof v === "string" ? v : (v && (v.name || v.title));
+    if (!name) continue;
+    state.names.set(sigOf(state.clusters[i]), {
+      name: String(name).trim(),
+      note: (v && v.note ? String(v.note).trim() : ""),
+    });
+    n++;
+  }
+  if (!n) throw new Error("Parsed it, but no group ids matched. Expecting keys 0…" + (state.clusters.length - 1) + ".");
+  return n;
+}
+
+function wireHandoff(root) {
+  const packet = HANDOFF_PROMPT + "\n\n" + JSON.stringify(buildDigest(), null, 1);
+  $("#packetPreview", root).textContent = packet;
+
+  const flash = (el, msg, bad) => {
+    el.textContent = msg;
+    el.classList.toggle("bad", !!bad);
+  };
+
+  $("#copyPacket", root).addEventListener("click", async e => {
+    const note = $("#copyNote", root);
+    try {
+      await navigator.clipboard.writeText(packet);
+      e.target.classList.add("done");
+      flash(note, `copied — ${(packet.length / 1024).toFixed(1)}kb, small enough to paste anywhere`);
+    } catch (err) {
+      flash(note, "clipboard blocked — open the preview below and copy from there", true);
+    }
+  });
+
+  $("#dlPacket", root).addEventListener("click", () => {
+    /* a blob: url — this builds the file locally, it does not fetch anything */
+    const url = URL.createObjectURL(new Blob([packet], { type: "application/json" }));
+    const a = document.createElement("a");
+    a.href = url; a.download = "midden-packet.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+
+  $("#applyNames", root).addEventListener("click", () => {
+    const note = $("#nameNote", root);
+    try {
+      const n = parseNames($("#namesIn", root).value);
+      flash(note, `named ${n} group${n === 1 ? "" : "s"}`);
+      renderMap(); wireMapHover();
+    } catch (err) { flash(note, err.message, true); }
+  });
+
+  const clr = $("#clearNames", root);
+  if (clr) clr.addEventListener("click", () => { state.names.clear(); renderMap(); wireMapHover(); });
+}
+
+/* ═══ VIEW: MAP ════════════════════════════════════════════
+   Conversations placed by what they are made of. Identity is
+   carried by the labels, not by colour: at this many groups no
+   categorical palette survives an all-pairs colourblind check,
+   so the dots stay one ink and the clusters are named in place.
+   ═══════════════════════════════════════════════════════════ */
+
+function renderMap() {
+  const ix = state.index, cl = state.clusters;
+  const kSlider = `<label>groups
+      <input type="range" data-ctl="k" min="2" max="${Math.max(2, Math.min(14, ix.N - 1))}" value="${state.opts.k}">
+      <span class="num" data-for="k">${state.opts.k}</span>
+    </label>`;
+
+  $("#v-map").innerHTML = `
+    <h2>The map</h2>
+    <p class="caption">Every conversation is a point. Two points sit close when they are built
+    from the same words. The axes are the two directions of greatest variation in the corpus —
+    they have no names, and no meaning beyond "this is what most separates your conversations".
+    <em>Hover a point to read its title; click a group below to lift it out.</em>
+    Points that land on the same pixel are nudged apart by a few pixels so a stack of
+    twenty doesn't read as one.</p>
+    ${controlsHTML(kSlider)}
+    <div id="mapwrap"><canvas id="map"></canvas><div id="mapnote">principal components 1 × 2 · ${ix.N} conversations</div></div>
+    <h2>Groups</h2>
+    <p class="caption">k-means over the same vectors, ${cl.length} groups. Each is named by the terms most
+    over-represented in it against the rest of the corpus. <em>Click to highlight on the map.</em></p>
+    <div class="clusters">${cl.map((c, i) => {
+      const named = state.names.get(sigOf(c));
+      return `
+      <div class="cl ${state.sel.cluster === i ? "on" : ""}" data-c="${i}">
+        ${named ? `<div class="named"><em>${esc(named.name)}</em></div>` : ""}
+        <div class="terms">${c.terms.map((t, n) => (n === 0 && !named) ? `<b>${esc(t)}</b>` : esc(t)).join(" · ")}</div>
+        <div class="meta">${c.size} conversation${c.size === 1 ? "" : "s"}</div>
+        ${named && named.note ? `<div class="note">${esc(named.note)}</div>` : ""}
+        <div class="ex">${(c.rep || c.members).slice(0, 3).map(m => `<span>${esc(state.convs[m].title)}</span>`).join("")}</div>
+      </div>`; }).join("")}</div>
+    ${handoffHTML()}
+  `;
+
+  $$(".cl", $("#v-map")).forEach(el => el.addEventListener("click", () => {
+    const i = +el.dataset.c;
+    state.sel.cluster = state.sel.cluster === i ? -1 : i;
+    $$(".cl", $("#v-map")).forEach(e => e.classList.toggle("on", +e.dataset.c === state.sel.cluster));
+    drawMap();
+  }));
+  wireControls($("#v-map"));
+  wireHandoff($("#v-map"));
+  drawMap();
+}
+
+let mapHit = [];
+
+/* Percentile domain: one far-out conversation must not squash the rest
+   into a corner. Points beyond the whiskers clamp to the edge. */
+function quantile(sorted, p) {
+  const i = (sorted.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+
+/* Conversations made of near-identical words project to near-identical
+   points, and a stack of dots at one pixel reads as one conversation.
+   Push them apart just far enough to be countable — a beeswarm, on a
+   neighbour grid so it stays linear in the number of points. Positions
+   shift by a few pixels; the structure does not. */
+function relax(P, minSep, w, h, pad, iters) {
+  const cell = minSep;
+  for (let it = 0; it < iters; it++) {
+    const buckets = new Map();
+    for (let i = 0; i < P.length; i++) {
+      const k = ((P[i].x / cell) | 0) + "," + ((P[i].y / cell) | 0);
+      let b = buckets.get(k);
+      if (!b) buckets.set(k, b = []);
+      b.push(i);
+    }
+    let moved = 0;
+    for (let i = 0; i < P.length; i++) {
+      const cx = (P[i].x / cell) | 0, cy = (P[i].y / cell) | 0;
+      for (let gx = cx - 1; gx <= cx + 1; gx++) for (let gy = cy - 1; gy <= cy + 1; gy++) {
+        const b = buckets.get(gx + "," + gy);
+        if (!b) continue;
+        for (const j of b) {
+          if (j <= i) continue;
+          let dx = P[j].x - P[i].x, dy = P[j].y - P[i].y;
+          let d = Math.sqrt(dx * dx + dy * dy);
+          if (d >= minSep) continue;
+          if (d < 1e-4) {   /* exactly coincident — split on a fixed spiral */
+            const a = ((i * 2654435761 + j * 40503) % 360) * Math.PI / 180;
+            dx = Math.cos(a); dy = Math.sin(a); d = 1;
+          }
+          const push = (minSep - d) / d * 0.5;
+          const ox = dx * push, oy = dy * push;
+          P[i].x -= ox; P[i].y -= oy;
+          P[j].x += ox; P[j].y += oy;
+          moved++;
+        }
+      }
+    }
+    if (!moved) break;
+  }
+  for (const p of P) {
+    p.x = Math.max(pad, Math.min(w - pad, p.x));
+    p.y = Math.max(pad, Math.min(h - pad, p.y));
+  }
+}
+
+function drawMap() {
+  const cv = $("#map");
+  if (!cv) return;
+  const pts = state.projection, cl = state.clusters;
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w * dpr; cv.height = h * dpr;
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+
+  const pad = 46;
+  const xs = pts.map(p => p[0]).sort((a, b) => a - b);
+  const ys = pts.map(p => p[1]).sort((a, b) => a - b);
+  let x0 = quantile(xs, 0.01), x1 = quantile(xs, 0.99);
+  let y0 = quantile(ys, 0.01), y1 = quantile(ys, 0.99);
+  if (x1 - x0 < 1e-9) { x0 = xs[0]; x1 = xs[xs.length - 1]; }
+  if (y1 - y0 < 1e-9) { y0 = ys[0]; y1 = ys[ys.length - 1]; }
+  /* Outliers are squashed into a margin rather than clamped flat: a hard
+     clamp stacks them on one pixel, which reads as a structure that is not
+     there. M is how much room the tail gets. */
+  const M = 0.06;
+  const squash = u => u < 0 ? -M * (1 - Math.exp(u * 4))
+                    : u > 1 ? 1 + M * (1 - Math.exp(-(u - 1) * 4)) : u;
+  const fit = u => (squash(u) + M) / (1 + M * 2);
+  const sx = v => pad + (x1 - x0 ? fit((v - x0) / (x1 - x0)) : 0.5) * (w - pad * 2);
+  const sy = v => pad + (y1 - y0 ? 1 - fit((v - y0) / (y1 - y0)) : 0.5) * (h - pad * 2);
+
+  /* recessive axes through the centroid */
+  g.strokeStyle = "#1d2127"; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(pad, sy(0)); g.lineTo(w - pad, sy(0)); g.stroke();
+  g.beginPath(); g.moveTo(sx(0), pad); g.lineTo(sx(0), h - pad); g.stroke();
+
+  const of = new Int32Array(pts.length);
+  cl.forEach((c, i) => c.members.forEach(m => of[m] = i));
+
+  const sel = state.sel.cluster;
+  const rBase = pts.length > 900 ? 2.4 : pts.length > 300 ? 3 : 3.6;
+  const P = pts.map((p, i) => ({ x: sx(p[0]), y: sy(p[1]), i }));
+  relax(P, rBase * 2 + 1.5, w, h, pad * 0.5, pts.length > 1200 ? 24 : pts.length > 400 ? 60 : 110);
+  mapHit = P;
+
+  for (const p of P) {
+    const on = sel < 0 || of[p.i] === sel;
+    const r = on ? (sel < 0 ? rBase : rBase + 1.2) : rBase - 1.2;
+    /* a 2px surface ring keeps overlapping marks separable */
+    g.beginPath(); g.arc(p.x, p.y, r + 1, 0, Math.PI * 2);
+    g.fillStyle = "#0d0f12"; g.fill();
+    g.beginPath(); g.arc(p.x, p.y, r, 0, Math.PI * 2);
+    g.fillStyle = on ? (sel < 0 ? "#6693b0" : "#94bcd6") : "#242b33";
+    g.fill();
+  }
+
+  /* Direct labels — identity carried by text, not by colour. At this many
+     groups no categorical palette clears an all-pairs colourblind check, so
+     the dots stay one ink and each group is named where it sits. */
+  g.font = "10px ui-monospace, SFMono-Regular, monospace";
+  g.textAlign = "center";
+  g.textBaseline = "alphabetic";
+  const placed = [];
+  const hitsDot = (lx, ly, tw) => P.some(q => Math.abs(q.x - lx) < tw / 2 + 5 && q.y > ly - 11 && q.y < ly + 4);
+  const hitsLabel = (lx, ly, tw) => placed.some(q => Math.abs(q.x - lx) < (q.w + tw) / 2 + 8 && Math.abs(q.y - ly) < 14);
+
+  cl.forEach((c, ci) => {
+    if (!c.members.length) return;
+    /* Anchor on the densest part of the group, not its topmost point or its
+       centre of mass: a group with one stray member would otherwise be named
+       somewhere it barely is. Find the member with the most neighbours, then
+       sit above the top of that neighbourhood. */
+    let dense = c.members[0], bestN = -1;
+    for (const m of c.members) {
+      let n = 0;
+      for (const o of c.members) if ((P[m].x - P[o].x) ** 2 + (P[m].y - P[o].y) ** 2 < 3600) n++;
+      if (n > bestN) { bestN = n; dense = m; }
+    }
+    let ax = P[dense].x, ay = P[dense].y;
+    for (const m of c.members) {
+      if ((P[m].x - P[dense].x) ** 2 + (P[m].y - P[dense].y) ** 2 >= 3600) continue;
+      if (P[m].y < ay) { ay = P[m].y; ax = P[m].x; }
+    }
+    const named = state.names.get(sigOf(c));
+    const text = named ? named.name : c.terms.slice(0, 2).join(" · ");
+    const tw = g.measureText(text).width;
+
+    /* Try straight up, then fan out. Two passes: first for a spot clear of
+       both dots and other labels, then — in a cloud dense enough that no such
+       spot exists — for one merely clear of other labels. A label over dots
+       only hides points; a label over a label is unreadable. */
+    let lx = ax, ly = ay - 13, found = false;
+    for (const strict of [true, false]) {
+      for (const dy of [13, 26, 40, 56, 74, 96]) {
+        for (const dx of [0, -0.6, 0.6, -1.2, 1.2, -1.9, 1.9]) {
+          const cy = ay - dy;
+          if (cy < 14) continue;
+          const bx = Math.max(tw / 2 + 6, Math.min(w - tw / 2 - 6, ax + dx * (tw / 2 + 24)));
+          if (hitsLabel(bx, cy, tw)) continue;
+          if (strict && hitsDot(bx, cy, tw)) continue;
+          lx = bx; ly = cy; found = true; break;
+        }
+        if (found) break;
+      }
+      if (found) break;
+    }
+    if (!found) { lx = Math.max(tw / 2 + 6, Math.min(w - tw / 2 - 6, ax)); ly = Math.max(14, ay - 13); }
+    placed.push({ x: lx, y: ly, w: tw });
+
+    /* a leader line, so a label pushed clear still points at its group */
+    if (Math.hypot(lx - ax, ly - ay) > 24) {
+      g.strokeStyle = "#2a3038"; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(lx, ly + 3); g.lineTo(ax, ay - 5); g.stroke();
+    }
+
+    g.fillStyle = "rgba(13,15,18,0.88)";
+    g.fillRect(lx - tw / 2 - 4, ly - 9, tw + 8, 13);
+    g.fillStyle = (sel === ci) ? "#94bcd6" : (named ? "#8f959d" : "#5a6068");
+    g.fillText(text, lx, ly + 1);
+  });
+}
+
+function wireMapHover() {
+  const cv = $("#map");
+  if (!cv || cv.dataset.wired) return;
+  cv.dataset.wired = "1";
+  cv.addEventListener("pointermove", e => {
+    const r = cv.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    let best = null, bd = 14 * 14;
+    for (const p of mapHit) { const d = (p.x - x) ** 2 + (p.y - y) ** 2; if (d < bd) { bd = d; best = p; } }
+    if (!best) { tip.classList.remove("on"); cv.style.cursor = "default"; return; }
+    const c = state.convs[best.i];
+    tip.innerHTML = `<b>${esc(c.title)}</b><br>${dstr(c.t)} · ${c.msgs.length} messages · ${compact(c.words)} words`;
+    tip.classList.add("on");
+    cv.style.cursor = "pointer";
+    tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 10, e.clientX + 14) + "px";
+    tip.style.top = Math.max(6, e.clientY - tip.offsetHeight - 12) + "px";
+  });
+  cv.addEventListener("pointerleave", () => tip.classList.remove("on"));
+  cv.addEventListener("click", e => {
+    const r = cv.getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    let best = null, bd = 14 * 14;
+    for (const p of mapHit) { const d = (p.x - x) ** 2 + (p.y - y) ** 2; if (d < bd) { bd = d; best = p; } }
+    if (best) { state.sel.conv = best.i; show("read"); renderRead(); }
+  });
+}
+
+/* ═══ VIEW: DRIFT ══════════════════════════════════════════ */
+
+function renderDrift() {
+  const ix = state.index, cs = state.convs;
+  const b = bucketiser(cs);
+  if (!b) { $("#v-drift").innerHTML = `<h2>Drift</h2><p class="empty">No usable timestamps in this export, so there is no time axis to draw.</p>`; return; }
+
+  const ranked = [];
+  for (let j = 0; j < ix.vocab.length; j++) ranked.push([j, ix.mass[j]]);
+  ranked.sort((a, b2) => b2[1] - a[1]);
+  const rows = ranked.slice(0, 20).map(([j]) => j);
+
+  const cols = b.order;
+  const colIdx = new Map(cols.map((k, i) => [k, i]));
+  const grid = rows.map(() => new Float64Array(cols.length));
+  const colConvs = new Int32Array(cols.length);
+
+  cs.forEach((c, ci) => {
+    if (!c.t) return;
+    const ck = colIdx.get(b.key(c.t));
+    if (ck === undefined) return;
+    colConvs[ck]++;
+    const v = ix.vectors[ci];
+    const pos = new Map();
+    for (let n = 0; n < v.idx.length; n++) pos.set(v.idx[n], v.val[n]);
+    rows.forEach((j, ri) => { const val = pos.get(j); if (val) grid[ri][ck] += val; });
+  });
+
+  /* normalise each row to its own peak — every term reads as its own arc */
+  const peaks = grid.map(r => Math.max(...r, 1e-9));
+
+  const head = `<tr><th></th>${cols.map(k => `<th class="collab">${esc(b.label(k))}</th>`).join("")}</tr>`;
+  const body = rows.map((j, ri) => `<tr><th class="rowlab">${esc(ix.vocab[j])}</th>` +
+    cols.map((k, ci) => {
+      const f = grid[ri][ci] / peaks[ri];
+      return `<td style="background:${rampAt(f)}" data-tip="<b>${esc(ix.vocab[j])}</b><br>${esc(b.label(k))} — ${(f * 100).toFixed(0)}% of its own peak<br>${colConvs[ci]} conversation(s) that ${b.mode}"></td>`;
+    }).join("") + `</tr>`).join("");
+
+  $("#v-drift").innerHTML = `
+    <h2>Drift</h2>
+    <p class="caption">The top twenty terms, laid along time by ${b.mode}.
+    <em>Each row is scaled to its own peak</em> — so a bright cell means "this was that term's
+    moment", not "this term is big". A row that fades left-to-right is something you stopped
+    talking about. <em>Hover any cell.</em></p>
+    ${controlsHTML()}
+    <div id="driftwrap"><table class="heat"><thead>${head}</thead><tbody>${body}</tbody></table></div>
+    <div class="ramp"><span>QUIET</span>${RAMP.map(c => `<i style="background:${c}"></i>`).join("")}<span>ITS PEAK</span></div>
+    <p class="caption" style="margin-top:22px">Gaps are real: a ${b.mode} with no conversations still
+    gets a column, so a silence looks like a silence.</p>
+  `;
+  $$(".heat td", $("#v-drift")).forEach(td => bindTip(td, td.dataset.tip));
+  wireControls($("#v-drift"));
+}
+
+/* ═══ VIEW: READ ═══════════════════════════════════════════ */
+
+let listShown = 200;
+function renderRead() {
+  const q = (state.query || "").trim().toLowerCase();
+  let list = state.convs.map((c, i) => ({ c, i }));
+  if (q) list = list.filter(({ c }) => c.title.toLowerCase().includes(q) || c.msgs.some(m => m.text.toLowerCase().includes(q)));
+  const sort = state.sort || "new";
+  list.sort((a, b) =>
+    sort === "new" ? (b.c.t || 0) - (a.c.t || 0) :
+    sort === "old" ? (a.c.t || 0) - (b.c.t || 0) :
+    sort === "long" ? b.c.words - a.c.words : a.c.title.localeCompare(b.c.title));
+
+  if (state.sel.conv < 0 && list.length) state.sel.conv = list[0].i;
+
+  const slice = list.slice(0, listShown);
+  const items = slice.map(({ c, i }) => `
+    <div class="item ${state.sel.conv === i ? "on" : ""}" data-i="${i}">
+      <div class="t">${esc(c.title)}</div>
+      <div class="m">${dstr(c.t)} · ${c.msgs.length} msg · ${compact(c.words)}w</div>
+    </div>`).join("");
+
+  $("#v-read").innerHTML = `
+    <div class="ctl">
+      <label>find <input type="search" id="q" value="${esc(state.query || "")}" placeholder="search every message" size="26"></label>
+      <label>order
+        <select id="sort">
+          <option value="new"${sort === "new" ? " selected" : ""}>newest</option>
+          <option value="old"${sort === "old" ? " selected" : ""}>oldest</option>
+          <option value="long"${sort === "long" ? " selected" : ""}>longest</option>
+          <option value="az"${sort === "az" ? " selected" : ""}>a–z</option>
+        </select>
+      </label>
+      <span class="num">${num(list.length)}</span>
+      <label style="letter-spacing:.14em">matching</label>
+    </div>
+    <div id="readsplit">
+      <div id="convlist">${items || `<p class="empty">Nothing matches.</p>`}
+        ${list.length > listShown ? `<div class="more">show ${Math.min(200, list.length - listShown)} more</div>` : ""}</div>
+      <div id="transcript"></div>
+    </div>`;
+
+  $("#q").addEventListener("input", e => {
+    state.query = e.target.value; listShown = 200;
+    clearTimeout(state._qt);
+    state._qt = setTimeout(() => { const at = document.activeElement === $("#q"); renderRead(); if (at) { const el = $("#q"); el.focus(); el.setSelectionRange(el.value.length, el.value.length); } }, 260);
+  });
+  $("#sort").addEventListener("change", e => { state.sort = e.target.value; renderRead(); });
+  $$("#convlist .item").forEach(el => el.addEventListener("click", () => { state.sel.conv = +el.dataset.i; renderRead(); }));
+  const more = $("#convlist .more");
+  if (more) more.addEventListener("click", () => { listShown += 200; renderRead(); });
+  renderTranscript();
+}
+
+function hl(text, q) {
+  const e = esc(text);
+  if (!q) return e;
+  const rx = new RegExp("(" + q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + ")", "gi");
+  return e.replace(rx, "<mark>$1</mark>");
+}
+
+let msgShown = 300;
+function renderTranscript() {
+  const c = state.convs[state.sel.conv];
+  const box = $("#transcript");
+  if (!c) { box.innerHTML = `<p class="empty">Pick a conversation.</p>`; return; }
+  const q = (state.query || "").trim();
+  const shown = c.msgs.slice(0, msgShown);
+  box.innerHTML = `
+    <div class="th">
+      <h3>${esc(c.title)}</h3>
+      <div class="m">${dstr(c.t)} · ${c.msgs.length} messages · ${num(c.words)} words · ${esc(c.kind)}</div>
+    </div>
+    ${shown.map(m => `
+      <div class="msg ${m.role}">
+        <div class="who">${m.role === "human" ? "you" : "claude"}</div>
+        <div class="body">${hl(m.text, q)}</div>
+        ${m.think ? `<details class="think"><summary>thinking · ${countWords(m.think)} words</summary><div class="body">${hl(m.think, q)}</div></details>` : ""}
+      </div>`).join("")}
+    ${c.msgs.length > msgShown ? `<button class="tablelink" id="moremsg">show the remaining ${c.msgs.length - msgShown} messages</button>` : ""}`;
+  const mm = $("#moremsg");
+  if (mm) mm.addEventListener("click", () => { msgShown += 1000; renderTranscript(); });
+  box.scrollTop = 0;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   4 · ORCHESTRATION
+   ═══════════════════════════════════════════════════════════ */
+
+const VIEWS = { corpus: renderCorpus, themes: renderThemes, map: renderMap, drift: renderDrift, read: renderRead };
+let current = "corpus";
+
+function show(v) {
+  current = v;
+  $$("#bar nav button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  $$(".view").forEach(s => s.classList.toggle("on", s.id === "v-" + v));
+  VIEWS[v]();
+  if (v === "map") wireMapHover();
+  window.scrollTo(0, 0);
+}
+
+function defaultK(n) { return Math.max(2, Math.min(10, Math.round(Math.sqrt(n / 2)))); }
+
+function recluster() {
+  const ix = state.index;
+  const k = Math.max(2, Math.min(state.opts.k || defaultK(ix.N), ix.N));
+  const km = kmeans(ix.vectors, ix.vocab.length, k, 1337);
+  state.clusters = labelClusters(ix, km, 5);
+  if (current === "map") { renderMap(); wireMapHover(); }
+}
+
+function recompute() {
+  state.index = buildIndex(state.convs, state.opts);
+  if (!state.opts.k) state.opts.k = defaultK(state.index.N);
+  state.projection = project(state.index);
+  recluster();
+  state.sel.cluster = -1;
+  VIEWS[current]();
+  if (current === "map") wireMapHover();
+}
+
+const status = $("#status"), errBox = $("#err");
+const say = s => { status.textContent = s; };
+
+async function load(files) {
+  errBox.textContent = "";
+  say("reading…");
+  await new Promise(r => setTimeout(r, 16));
+  try {
+    await ingest(files);
+    say(`counting ${num(state.convs.length)} conversations…`);
+    await new Promise(r => setTimeout(r, 16));
+    state.opts.k = 0;
+    recompute();
+    $("#corpusname").textContent = state.sourceLabel;
+    $("#landing").style.display = "none";
+    $("#app").classList.add("on");
+    show("corpus");
+  } catch (e) {
+    say("");
+    errBox.textContent = (e && e.message) || String(e);
+    console.error(e);
+  }
+}
+
+/* ── wiring ─────────────────────────────────────────────── */
+
+const drop = $("#drop"), picker = $("#picker");
+drop.addEventListener("click", () => picker.click());
+picker.addEventListener("change", () => { if (picker.files.length) load(Array.from(picker.files)); });
+
+["dragenter", "dragover"].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("hot"); }));
+["dragleave", "drop"].forEach(ev => document.addEventListener(ev, e => { e.preventDefault(); if (ev === "dragleave" && e.relatedTarget) return; drop.classList.remove("hot"); }));
+document.addEventListener("drop", async e => {
+  e.preventDefault();
+  const files = await entriesFromDrop(e.dataTransfer);
+  if (files.length) load(files);
+});
+
+$$("#bar nav button").forEach(b => b.addEventListener("click", () => show(b.dataset.v)));
+
+let rt;
+window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(() => { if (current === "map") drawMap(); }, 140); });
+
+/* keyboard: 1–5 switch views when not typing */
+document.addEventListener("keydown", e => {
+  if (!$("#app").classList.contains("on")) return;
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) return;
+  const keys = ["corpus", "themes", "map", "drift", "read"];
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= 5) show(keys[n - 1]);
+});
+</script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # Outboard
 
-Three tools that keep things outside your head, because some heads do not hold them.
+Four tools that keep things outside your head, because some heads do not hold them.
 
 Each is a single HTML file with no build step, no account and no install. Open it and it
 works. Everything you enter stays in your own browser.
@@ -19,7 +19,7 @@ a retrievable occasion, only a fact you might know. With **ADHD** the working-me
 that everything else assumes is available is often already full.
 
 When those assumptions fail, the usual result is not "this tool was built for someone else."
-It is "I must be stupid." These three are attempts at the other design: nothing to picture,
+It is "I must be stupid." These four are attempts at the other design: nothing to picture,
 nothing to recall, nothing held in the head.
 
 The mechanisms matter more than the label. A tool can be built this way for anyone.
@@ -64,10 +64,39 @@ large text, one action per screen.
 
 Manual entry works with no server and no key. Only the photo recognition needs either.
 
+### `midden.html` — The Midden
+A reader for your own chat exports. A midden is a refuse heap, and archaeologists read
+civilisations out of them — not from the monuments, which were built to be read, but from
+what nobody meant to leave behind. A year of conversations is the same: nobody writes it as
+a document, so whatever is in there accumulated rather than being declared.
+
+Which makes it the right shape for a memory that does not re-run. You cannot recall a year
+of talking, but you can read what it left.
+
+Drop in a claude.ai export (the `.zip`, or the `conversations.json` inside), a Claude Code
+`.jsonl`, or a ChatGPT export, and it lays out five views: **corpus** (what is actually in
+the file), **themes** (tf-idf across the whole heap, plus repeated phrases), the **map**
+(every conversation a point, placed by what it is made of, grouped and named), **drift**
+(top terms along time, each row scaled to its own peak, so what you *stopped* talking about
+is visible), and **read** (the transcripts, searchable).
+
+No network calls, no API key, no upload — the file is read in the tab and stays there. The
+price of that is honesty about method: this is word counting, it has no idea what anything
+means, and the themes panel says so on the panel.
+
+Which is what **hand it to a bro** is for. The page cannot call a model and should not, but
+a model in a chat window is the same model an API key would reach — the difference is who
+carries the data. So the map view packs a small parcel (each group's distinctive terms and
+a few real excerpts, around 7kb, shown to you in full before it goes anywhere), you paste it
+into any chat you already have open, and paste the reply back. The groups get named in your
+language instead of the counter's. No key, no account, nothing leaves except what you
+personally carried: you are the network call.
+
 ## Running them
 
-The Ledger and Anchor need nothing at all — download the file, open it, done. They work
-from `file://` with no internet connection (the Ledger fetches Python itself on first run).
+The Ledger, Anchor and The Midden need nothing at all — download the file, open it, done.
+They work from `file://` with no internet connection (the Ledger fetches Python itself on
+first run, and The Midden never touches the network at all).
 
 Pantry Pal's camera needs a local server, for two reasons: browsers will not grant camera
 access to a `file://` page, and an API key must never sit in a page anyone can view-source.
